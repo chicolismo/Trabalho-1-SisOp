@@ -11,10 +11,17 @@
 #include "../include/support.h"
 #include "../include/queue.h"
 
+//=============================================================================
+// Tipos
+//=============================================================================
+typedef char byte;
+typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
 
 //=============================================================================
 // Constantes
 //=============================================================================
+
+#define STACK_SIZE (sizeof(byte) * SIGSTKSZ)
 
 // Faz "cast" um arg para um ponteiro de função void sem argumentos
 #define VOID_FUNCTION(arg) (void (*)(void)) (arg)
@@ -34,9 +41,6 @@
 //==============================================================================
 // Globais
 //==============================================================================
-
-typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
-
 bool initialized_globals = false;
 
 // As filas de threads
@@ -79,14 +83,6 @@ void init() {
         terminated_queues[i] = malloc(queue_size);
         CreateFila2(terminated_queues[i]);
     }
-
-    getcontext(&main_thread.context);
-    // TODO: É preciso salvar mais coisas do contexto... Descobrir o quê, exatamente.
-    //
-    // main_thread.context.uc_link;
-    // main_thread.context.uc_sigmask;
-    // main_thread.context.uc_stack;
-    // main_thread.context.uc_mcontext;
 
 
     initialized_globals = true;
@@ -189,10 +185,20 @@ int generate_tid() {
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
 int ccreate(void *(*start)(void *), void *arg, int priority) {
+    // Será que esta pilha deveria ser compartilhada???
+    byte *stack = malloc(STACK_SIZE);
+
     if (!initialized_globals) {
         init();
+
+        getcontext(&main_thread.context);
+        // TODO: É preciso salvar mais coisas do contexto... Descobrir o quê, exatamente.
+        // main_thread.context.uc_link;
+        // main_thread.context.uc_sigmask;
+         main_thread.context.uc_stack.ss_sp = stack;
+         main_thread.context.uc_stack.ss_size = STACK_SIZE;
+        // main_thread.context.uc_mcontext;
         makecontext(&main_thread.context, VOID_FUNCTION(start), 1, arg);
-        current_context = &main_thread.context;
     }
 
     TCB_t *th = malloc(sizeof(TCB_t));
@@ -205,7 +211,6 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
 
     // Inicializa o contexto da thread
     getcontext(&th->context);
-
     // TODO: Verificar se é isso mesmo
     // Descobrir o que fazer com o resto do contexto.
     //
@@ -215,7 +220,6 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     // th->context.uc_mcontext;
     //
     makecontext(&(main_thread.context), VOID_FUNCTION(start), 1, arg);
-
 
     // Associa uma função ao contexto
     makecontext(&th->context, VOID_FUNCTION(start), 1, arg);
