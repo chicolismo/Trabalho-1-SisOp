@@ -16,14 +16,13 @@ INC_DIR=./include
 BIN_DIR=./bin
 SRC_DIR=./src
 
-all: libcthread.a
+all: libcthread.a 
 
 libcthread.a: $(BIN_DIR)/cthread.o $(BIN_DIR)/support.o
 	ar crs $(LIB_DIR)/libcthread.a $(BIN_DIR)/cthread.o $(BIN_DIR)/support.o
 
-$(BIN_DIR)/cthread.o: $(SRC_DIR)/*.c
-	$(CC) -I$(INC_DIR) $(SRC_DIR)/*.c -Wall -ls -o $(BIN_DIR)/cthread.o
+$(BIN_DIR)/cthread.o: $(SRC_DIR)/cthread.c
+	$(CC) -c -I$(INC_DIR) $(SRC_DIR)/cthread.c -Wall -ls -o $(BIN_DIR)/cthread.o   
 
 clean:
 	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/cthread.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
-

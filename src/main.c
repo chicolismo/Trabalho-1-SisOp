@@ -1,14 +1,10 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include "../include/includes.h"
+/*int main()*/
+/*{*/
+    /*char *names = malloc(300);*/
+    /*cidentify(names, 300);*/
 
-int main()
-{
-    char *names = malloc(300);
-    cidentify(names, 300);
+    /*printf("Fuck off\n");*/
+    /*printf("%s\n", names);*/
 
-    printf("Fuck off\n");
-    printf("%s\n", names);
-
-    return EXIT_SUCCESS;
-}
+    /*return EXIT_SUCCESS;*/
+/*}*/

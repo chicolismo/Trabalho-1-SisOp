@@ -7,54 +7,93 @@
 #include "../include/queue.h"
 
 //=============================================================================
-// As constantes usadas no programa devem ser definidas aqui.
+// Constantes
 //=============================================================================
 
-//-----------------------------------------------------------------------------
 // ccreate
-//-----------------------------------------------------------------------------
 #define CCREATE_ERROR -1
 
-//-----------------------------------------------------------------------------
 // csem_init
-//-----------------------------------------------------------------------------
 #define CSEM_INIT_SUCCESS 0
 #define CSEM_INIT_ERROR -1
 
-//-----------------------------------------------------------------------------
 // cidentify
-//-----------------------------------------------------------------------------
 #define CIDENTIFY_SUCCESS 0
 #define CIDENTIFY_ERROR -1
 
 
 //==============================================================================
-// Aqui ficarão todas as variáveis globais usadas pelo programa
+// Globais
 //==============================================================================
 
-static bool initialized_globals = false;
+typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
+
+bool initialized_globals = false;
+
+// A thread da "main"
+TCB_t main_thread;
+
+TCB_t *running_thread;              // Executando
 
 // As filas de threads
-static PFILA2 thread_queues[4];
+// Existem 4 filas de cada tipo, uma para cada prioridade
+PFILA2 ready_queues[4];      // Aptos
+PFILA2 blocked_queues[4];    // Bloqueados
+PFILA2 terminated_queues[4]; // Terminados
 
+
+//==============================================================================
+// Funções
+//==============================================================================
 
 //------------------------------------------------------------------------------
 // Esta função inicializa todas as variáveis globais das quais as outras
 // funções dependem.  Deve ser chamada nas outras funções, por garantia.
 //------------------------------------------------------------------------------
-void init()
-{
+void init() {
     if (initialized_globals) {
         return;
     }
 
-    // Inicializa as filas de threads
+    // Inicializa as diversas filas de threads
     int i;
+    size_t queue_size = sizeof(struct sFila2);
     for (i = 0; i < 4; ++i) {
-        CreateFila2(thread_queues[i]);
+        ready_queues[i] = malloc(queue_size);
+        CreateFila2(ready_queues[i]);
+
+        blocked_queues[i] = malloc(queue_size);
+        CreateFila2(blocked_queues[i]);
+
+        terminated_queues[i] = malloc(queue_size);
+        CreateFila2(terminated_queues[i]);
     }
 
+    getcontext(&(main_thread.context));
+
     initialized_globals = true;
+}
+
+
+//------------------------------------------------------------------------------
+// Inicializa um semáforo
+//------------------------------------------------------------------------------
+int csem_init(csem_t *sem, int count) {
+    // TODO: Descobrir como seria um erro.
+    if (sem == NULL) {
+        return CSEM_INIT_ERROR;
+    }
+
+    // Inicializa a fila referente ao semáforo
+    sem->fila = malloc(sizeof(struct sFila2)); // PFILA2 é um tipo ponteiro
+    if (queue_create(sem->fila) != 0) {
+        return CSEM_INIT_ERROR;
+    }
+
+    // Inicializa a contagem do semáforo
+    sem->count = count;
+
+    return CSEM_INIT_SUCCESS;
 }
 
 
@@ -62,13 +101,10 @@ void init()
 // Gera uma nova tid
 //------------------------------------------------------------------------------
 int current_tid = 0;
-int get_tid() {
-    ++current_tid;
-    if (current_tid < 0) {
-        current_tid = 0;
-    }
-    return current_tid;
+int generate_tid() {
+    return ++current_tid;
 }
+
 
 //------------------------------------------------------------------------------
 // Cria uma nova thread.
@@ -86,15 +122,15 @@ int get_tid() {
 //  Quando executada corretamente: retorna um valor positivo, que representa o
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
-int ccreate(void *(*start) (void *), void *arg, int priority)
-{
+int ccreate(void *(*start)(void *), void *arg, int priority) {
     init();
 
     TCB_t *th = malloc(sizeof(TCB_t));
     if (th == NULL) {
         return CCREATE_ERROR;
     }
-    th->tid = get_tid();
+    th->state = NEW;
+    th->tid = generate_tid();
     th->prio = priority;
 
     // TODO: Verificar se é isso mesmo
@@ -105,8 +141,10 @@ int ccreate(void *(*start) (void *), void *arg, int priority)
     // Associa uma função ao contexto
     makecontext(&th->context, (void *) start, (int) arg);
 
-    // Coloca a thread na fila de aptos correspondente
-    FILA2 *queue = thread_queues[priority];
+    // Depois de ser criada, a thread entre para sua fila de aptos
+    // correspondente
+    FILA2 *queue = ready_queues[priority];
+    th->state = READY;
     push(queue, th);
 
     // TODO:
@@ -119,10 +157,10 @@ int ccreate(void *(*start) (void *), void *arg, int priority)
 
 
 //------------------------------------------------------------------------------
-// Destrói a thread
+// Destrói a thread.
+// NOTE: Talvez não seja necessária
 //------------------------------------------------------------------------------
-TCB_t *cdestroy(TCB_t *thread)
-{
+TCB_t *cdestroy(TCB_t *thread) {
     free(thread);
     thread = NULL;
     return thread;
@@ -136,8 +174,7 @@ TCB_t *cdestroy(TCB_t *thread)
 //  char *name :: Endereço aonde serão copiados os nomes dos alunos
 //  int size :: Limite de caracteres que serão copiados para o endereço
 //------------------------------------------------------------------------------
-int cidentify(char *name, int size)
-{
+int cidentify(char *name, int size) {
     // TODO: Incluir os dados do último integrante.
     char *names =
         "Carlos Pinheiro -- 109910\n"
@@ -148,50 +185,34 @@ int cidentify(char *name, int size)
 
 
 //------------------------------------------------------------------------------
-// Inicializa um semáforo
-//------------------------------------------------------------------------------
-int csem_init(csem_t *sem, int count)
-{
-    init();
-    // TODO: Descobrir como seria um erro.
-    if (sem == NULL) {
-        return CSEM_INIT_ERROR;
-    }
-
-    sem->fila = NULL;
-    sem->count = count;
-    return CSEM_INIT_SUCCESS;
-}
-
-
-//------------------------------------------------------------------------------
 // Funções da fila
 //------------------------------------------------------------------------------
-int queue_create(PFILA2 queue)
-{
+int queue_create(PFILA2 queue) {
     return CreateFila2(queue);
 }
 
+
 // Coloca a thread "th" no final da fila "queue"
-int push(PFILA2 queue, TCB_t *th)
-{
+int push(PFILA2 queue, TCB_t *th) {
     int ret = AppendFila2(queue, (void *) th);
     FirstFila2(queue);
     return ret;
 }
 
+
 // Coloca o primeiro elemento de "queue" em "th", e o remove da fila
-TCB_t *shift(PFILA2 queue)
-{
+TCB_t *shift(PFILA2 queue) {
     FirstFila2(queue);
-    TCB_t *th = (TCB_t*) GetAtIteratorFila2(queue);
+    TCB_t *th = (TCB_t *) GetAtIteratorFila2(queue);
     DeleteAtIteratorFila2(queue);
     return th;
 }
 
-bool empty(PFILA2 queue)
-{
+
+bool empty(PFILA2 queue) {
     // Quando não consegue "setar" para o primeiro elemento da fila,
     // então o resultado é diferente de zero e a fila está vazia.
     return FirstFila2(queue) != 0;
 }
+
+
