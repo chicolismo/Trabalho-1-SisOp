@@ -1,14 +1,23 @@
+#ifdef __APPLE__
+#define _XOPEN_SOURCE 500 // Carlos: Gambiarra para não exibir avisos de "deprecated" na minha máquina.
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ucontext.h>
 #include "../include/cthread.h"
 #include "../include/cdata.h"
 #include "../include/support.h"
 #include "../include/queue.h"
 
+
 //=============================================================================
 // Constantes
 //=============================================================================
+
+// Faz "cast" um arg para um ponteiro de função void sem argumentos
+#define VOID_FUNCTION(arg) (void (*)(void)) (arg)
 
 // ccreate
 #define CCREATE_ERROR -1
@@ -30,17 +39,16 @@ typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
 
 bool initialized_globals = false;
 
-// A thread da "main"
-TCB_t main_thread;
-
-TCB_t *running_thread;              // Executando
-
 // As filas de threads
 // Existem 4 filas de cada tipo, uma para cada prioridade
 PFILA2 ready_queues[4];      // Aptos
 PFILA2 blocked_queues[4];    // Bloqueados
 PFILA2 terminated_queues[4]; // Terminados
+TCB_t *running_thread;       // Executando
 
+TCB_t main_thread; // A thread da "main"
+
+ucontext_t *current_context; // O contexto atual
 
 //==============================================================================
 // Funções
@@ -55,9 +63,12 @@ void init() {
         return;
     }
 
+    // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
+    // partir do tipo PFILA2, que é um ponteiro.
+    size_t queue_size = sizeof(struct sFila2);
+
     // Inicializa as diversas filas de threads
     int i;
-    size_t queue_size = sizeof(struct sFila2);
     for (i = 0; i < 4; ++i) {
         ready_queues[i] = malloc(queue_size);
         CreateFila2(ready_queues[i]);
@@ -69,7 +80,14 @@ void init() {
         CreateFila2(terminated_queues[i]);
     }
 
-    getcontext(&(main_thread.context));
+    getcontext(&main_thread.context);
+    // TODO: É preciso salvar mais coisas do contexto... Descobrir o quê, exatamente.
+    //
+    // main_thread.context.uc_link;
+    // main_thread.context.uc_sigmask;
+    // main_thread.context.uc_stack;
+    // main_thread.context.uc_mcontext;
+
 
     initialized_globals = true;
 }
@@ -105,11 +123,59 @@ int generate_tid() {
     return ++current_tid;
 }
 
+/*
+ * =============================================================================
+ * Sobre o ucontext (segundo a man page)
+ * =============================================================================
+ *
+ * UCONTEXT(3)    BSD Library Functions Manual        UCONTEXT(3)
+ * 
+ * NAME
+ *     ucontext -- user thread context
+ * 
+ * LIBRARY
+ *     Standard C Library (libc, -lc)
+ * 
+ * SYNOPSIS
+ *     #include <ucontext.h>
+ * 
+ * DESCRIPTION
+ * 
+ *     The ucontext_t type is a structure type suitable for holding the
+ *     context for a user thread of execution.  A thread's context includes its stack,
+ *     saved registers, and list of blocked signals.
+ * 
+ *     The ucontext_t structure contains at least these fields:
+ * 
+ *     ucontext_t *uc_link      context to assume when this one returns
+ *     sigset_t uc_sigmask      signals being blocked
+ *     stack_t uc_stack         stack area
+ *     mcontext_t uc_mcontext   saved registers
+ * 
+ *     The uc_link field points to the context to resume when this context's entry
+ *     point function returns.  If uc_link is equal to NULL, then the process exits
+ *     when this context returns.
+ * 
+ *     The uc_mcontext field is machine-dependent and should be treated as opaque by
+ *     portable applications.
+ * 
+ *     The following functions are defined to manipulate ucontext_t structures:
+ * 
+ *     int getcontext(ucontext_t *);
+ *     int setcontext(const ucontext_t *);
+ *     void makecontext(ucontext_t *, void (*)(void), int, ...);
+ *     int swapcontext(ucontext_t *, const ucontext_t *);
+ * 
+ * SEE ALSO
+ *     sigaltstack(2), getcontext(3), makecontext(3)
+ * 
+ * BSD             September 10, 2002                BSD
+ */
 
 //------------------------------------------------------------------------------
 // Cria uma nova thread.
 //
-// Parâmetros:
+// Parmetros:
 //  start: ponteiro para a função que a thread executará.
 //
 //  arg: um parâmetro que pode ser passado para a thread na sua criação.
@@ -123,7 +189,11 @@ int generate_tid() {
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
 int ccreate(void *(*start)(void *), void *arg, int priority) {
-    init();
+    if (!initialized_globals) {
+        init();
+        makecontext(&main_thread.context, VOID_FUNCTION(start), 1, arg);
+        current_context = &main_thread.context;
+    }
 
     TCB_t *th = malloc(sizeof(TCB_t));
     if (th == NULL) {
@@ -133,24 +203,28 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     th->tid = generate_tid();
     th->prio = priority;
 
-    // TODO: Verificar se é isso mesmo
-
     // Inicializa o contexto da thread
     getcontext(&th->context);
 
+    // TODO: Verificar se é isso mesmo
+    // Descobrir o que fazer com o resto do contexto.
+    //
+    // th->context.uc_link;
+    // th->context.uc_sigmask;
+    // th->context.uc_stack;
+    // th->context.uc_mcontext;
+    //
+    makecontext(&(main_thread.context), VOID_FUNCTION(start), 1, arg);
+
+
     // Associa uma função ao contexto
-    makecontext(&th->context, (void *) start, (int) arg);
+    makecontext(&th->context, VOID_FUNCTION(start), 1, arg);
 
     // Depois de ser criada, a thread entre para sua fila de aptos
     // correspondente
     FILA2 *queue = ready_queues[priority];
     th->state = READY;
     push(queue, th);
-
-    // TODO:
-    // Colocar a thread na sua devida fila, dependendo da prioridade.
-    // Também precisamos descobrir o quê fazer com "start" e "arg".
-    // Não esquecer do contexto.
 
     return th->tid;
 }
@@ -200,7 +274,7 @@ int push(PFILA2 queue, TCB_t *th) {
 }
 
 
-// Coloca o primeiro elemento de "queue" em "th", e o remove da fila
+// Retorna o primeiro elemento de "queue" e o remove da fila.
 TCB_t *shift(PFILA2 queue) {
     FirstFila2(queue);
     TCB_t *th = (TCB_t *) GetAtIteratorFila2(queue);
