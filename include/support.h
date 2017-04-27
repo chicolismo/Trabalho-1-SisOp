@@ -98,7 +98,7 @@ int NextFila2(PFILA2 pFila);
 //  Ponteiro válido, se conseguiu
 //  NULL, caso contrário (erro, lista vazia ou iterador invalido)
 //------------------------------------------------------------------------------
-void    *GetAtIteratorFila2(PFILA2 pFila);
+void *GetAtIteratorFila2(PFILA2 pFila);
 
 
 //------------------------------------------------------------------------------

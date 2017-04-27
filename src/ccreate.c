@@ -52,6 +52,7 @@ TCB_t *cdestroy(TCB_t *thread)
 //  Quando executada corretamente: retorna um valor positivo, que representa o
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
+/*int ccreate(void *(*start) (void *), void *arg, int priority)*/
 int ccreate(void *(*start) (void *), void *arg, int priority)
 {
     init();
@@ -62,6 +63,18 @@ int ccreate(void *(*start) (void *), void *arg, int priority)
     }
     th->tid = get_tid();
     th->prio = priority;
+
+    // TODO: Verificar se é isso mesmo
+
+    // Inicializa o contexto da thread
+    getcontext(&th->context);
+
+    // Associa uma função ao contexto
+    makecontext(&th->context, (void *) start, (int) arg);
+
+    // Coloca a thread na fila de aptos correspondente
+    FILA2 *queue = thread_queues[priority];
+    push(queue, th);
 
     // TODO:
     // Colocar a thread na sua devida fila, dependendo da prioridade.

@@ -16,10 +16,7 @@ void init()
     // Inicializa as filas de threads
     int i;
     for (i = 0; i < 4; ++i) {
-        thread_queues[i] = malloc(sizeof(PFILA2));
-        thread_queues[i]->it = NULL;
-        thread_queues[i]->first = NULL;
-        thread_queues[i]->last = NULL;
+        CreateFila2(thread_queues[i]);
     }
 
     initialized_globals = true;

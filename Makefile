@@ -16,13 +16,14 @@ INC_DIR=./include
 BIN_DIR=./bin
 SRC_DIR=./src
 
-all: main
+all: libcthread.a
 
-main: #dependências para a regra1
-	#$(CC) -std=c99 -o $(LIB_DIR)/cthread.a -c $(SRC_DIR)/main.c -Wall -g
-	$(CC) -o $(BIN_DIR)/main $(SRC_DIR)/*.c -Wall -g
+libcthread.a: $(BIN_DIR)/cthread.o $(BIN_DIR)/support.o
+	ar crs $(LIB_DIR)/libcthread.a $(BIN_DIR)/cthread.o $(BIN_DIR)/support.o
 
+$(BIN_DIR)/cthread.o: $(SRC_DIR)/*.c
+	$(CC) -I$(INC_DIR) $(SRC_DIR)/*.c -Wall -ls -o $(BIN_DIR)/cthread.o
 
 clean:
-	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
+	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/cthread.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
 

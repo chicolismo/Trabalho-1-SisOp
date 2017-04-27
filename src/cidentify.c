@@ -10,10 +10,10 @@
 //------------------------------------------------------------------------------
 int cidentify(char *name, int size)
 {
-    // TODO: Incluir o resto dos dados.
+    // TODO: Incluir os dados do último integrante.
     char *names =
-        "Carlos F. Pinheiro -- 109910\n"
-        "Bruno Feil -- 216631";
+        "Carlos Pinheiro -- 109910\n"
+        "Bruno Feil      -- 216631";
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
