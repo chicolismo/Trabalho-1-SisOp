@@ -57,6 +57,28 @@ TCB_t *running_thread;    // Executando
 // Funções
 //==============================================================================
 
+
+//------------------------------------------------------------------------------
+//Funcoes de Semaforo
+//------------------------------------------------------------------------------
+
+int insert_semaphore_on_blocked_semaphor(csem_t *sem){
+    //funcao que insere um semaforo na lista de semaforos criados.
+    return 0;
+}
+
+TCB_t* get_first_of_semaphore_queue(csem_t *sem) {
+    //funcao que remove e retorna o primeiro elemento da fila de um semaforo
+    return 0;	
+}
+
+TCB_t* get_thread_from_blocked_semaphor(int tid) {
+    //funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
+    //NAO REMOVE nenhuma thread, somente retorna um ponteiro a ela
+    return 0;	
+}
+
+
 //------------------------------------------------------------------------------
 // Esta função inicializa todas as variáveis globais das quais as outras
 // funções dependem.  Deve ser chamada nas outras funções, por garantia.
@@ -94,19 +116,19 @@ void init() {
 int csem_init(csem_t *sem, int count) {
     // TODO: Descobrir como seria um erro.
     if (sem == NULL) {
+        //Nao e possivel inicializar um ponteiro para um semaforo nulo.
         return CSEM_INIT_ERROR;
     }
-
-    // Inicializa a fila referente ao semáforo
-    sem->fila = malloc(sizeof(struct sFila2)); // PFILA2 é um tipo ponteiro
-    if (CreateFila2(sem->fila) != 0) {
+    if (sem->fila != NULL){
+        //nao e possivel inicializar um semaforo ja inicializado
         return CSEM_INIT_ERROR;
     }
-
     // Inicializa a contagem do semáforo
     sem->count = count;
-
-    return CSEM_INIT_SUCCESS;
+    
+    // Inicializa a fila referente ao semáforo
+    sem->fila = (FILA2)malloc(sizeof(FILA2)); // PFILA2 é um tipo ponteiro
+    return CreateFila2(sem->fila);
 }
 
 
@@ -232,6 +254,51 @@ TCB_t *cdestroy(TCB_t *thread) {
     return thread;
 }
 
+/*
+	Tranca o semaforo se o mesmo ainda nao esta trancado, se ja estiver trancado
+	coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
+*/
+int cwait(csem_t *sem) {
+	
+	if ((sem == NULL) || (sem->fila == NULL)) {
+		// Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+		return ERROR_CODE;
+	}
+	
+	if (sem->count > 0) {
+		// O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
+		sem->count -= 1;
+		return SUCCESS_CODE;
+	} else {
+		// O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
+		sem->count -= 1;
+        //altera o estado da thread ativa para bloqueado.
+		//insere na fila de bloqueados do semaforo a thread ativa.
+
+    	//executa o escalonador.
+	}
+}
+/*
+	Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
+*/
+int csignal(csem_t *sem) {
+	if ((sem == NULL) || (sem->fila == NULL)) {
+		//Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+		return ERROR_CODE;
+	
+	}
+
+	sem->count += 1;
+	//TCB_t *thread = (TCB_t *)primeira_thread_bloqueada_no_semaforo(sem);	
+	/*if (ha thread bloqueada / sem->fila != NULL) {
+		estado da thread e modificado para APTO. --- thread->state = PROCST_APTO;
+		return funcao_de_inserir_na_fila_de_aptos(thread);
+	} else {
+		O semaforo esta livre. Segue execucao.
+		return SUCCESS_CODE;
+	}*/
+}
+
 
 //------------------------------------------------------------------------------
 // Copia o nome e número do cartão dos alunos para um endereço fornecido
@@ -249,6 +316,8 @@ int cidentify(char *name, int size)
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
+
+
 
 
 //==============================================================================
