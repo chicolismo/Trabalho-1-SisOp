@@ -28,10 +28,11 @@ struct sFila2 {
     struct  sFilaNode2 *last;
 };
 
-typedef struct sFilaNode2 NODE2;
-typedef struct sFila2     FILA2;
-typedef struct sFilaNode2 *PNODE2;
-typedef struct sFila2     *PFILA2;
+typedef struct sFilaNode2  NODE2;
+typedef struct sFila2      FILA2;
+
+typedef struct sFilaNode2* PNODE2;
+typedef struct sFila2*     PFILA2;
 
 //------------------------------------------------------------------------------
 // Informa a versão da biblioteca

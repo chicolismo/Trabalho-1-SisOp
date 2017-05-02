@@ -17,6 +17,7 @@
 typedef char byte;
 typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
 
+
 //=============================================================================
 // Constantes
 //=============================================================================
@@ -43,16 +44,14 @@ typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
 //==============================================================================
 bool initialized_globals = false;
 
-// As filas de threads
-// Existem 4 filas de cada tipo, uma para cada prioridade
-PFILA2 ready_queues[4];      // Aptos
-PFILA2 blocked_queues[4];    // Bloqueados
-PFILA2 terminated_queues[4]; // Terminados
-TCB_t *running_thread;       // Executando
-
-TCB_t main_thread; // A thread da "main"
-
-ucontext_t *current_context; // O contexto atual
+//------------------------------------------------------------------------------
+// As filas de threads.
+// Devem ser ponteiros para podermos usar CreateFila2.
+//------------------------------------------------------------------------------
+PFILA2 ready[4];          // Quatro filas de aptos
+PFILA2 blocked_join;      // Bloqueados esperando outra thread terminar
+PFILA2 blocked_semaphor;  // Bloqueados esperando semáforo
+TCB_t *running_thread;    // Executando
 
 //==============================================================================
 // Funções
@@ -67,23 +66,23 @@ void init() {
         return;
     }
 
+    // TODO: Criar a thread da main e colocar em executando.
+
     // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
     // partir do tipo PFILA2, que é um ponteiro.
-    size_t queue_size = sizeof(struct sFila2);
 
     // Inicializa as diversas filas de threads
+    size_t queue_size = sizeof(struct sFila2);
     int i;
     for (i = 0; i < 4; ++i) {
-        ready_queues[i] = malloc(queue_size);
-        CreateFila2(ready_queues[i]);
-
-        blocked_queues[i] = malloc(queue_size);
-        CreateFila2(blocked_queues[i]);
-
-        terminated_queues[i] = malloc(queue_size);
-        CreateFila2(terminated_queues[i]);
+        ready[i] = malloc(queue_size);
+        CreateFila2(ready[i]);
     }
+    blocked_join = malloc(queue_size);
+    CreateFila2(blocked_join);
 
+    blocked_semaphor = malloc(queue_size);
+    CreateFila2(blocked_semaphor);
 
     initialized_globals = true;
 }
@@ -100,7 +99,7 @@ int csem_init(csem_t *sem, int count) {
 
     // Inicializa a fila referente ao semáforo
     sem->fila = malloc(sizeof(struct sFila2)); // PFILA2 é um tipo ponteiro
-    if (queue_create(sem->fila) != 0) {
+    if (CreateFila2(sem->fila) != 0) {
         return CSEM_INIT_ERROR;
     }
 
@@ -186,19 +185,10 @@ int generate_tid() {
 //------------------------------------------------------------------------------
 int ccreate(void *(*start)(void *), void *arg, int priority) {
     // Será que esta pilha deveria ser compartilhada???
-    byte *stack = malloc(STACK_SIZE);
+    byte *context_stack = malloc(STACK_SIZE);
 
     if (!initialized_globals) {
         init();
-
-        getcontext(&main_thread.context);
-        // TODO: É preciso salvar mais coisas do contexto... Descobrir o quê, exatamente.
-        // main_thread.context.uc_link;
-        // main_thread.context.uc_sigmask;
-         main_thread.context.uc_stack.ss_sp = stack;
-         main_thread.context.uc_stack.ss_size = STACK_SIZE;
-        // main_thread.context.uc_mcontext;
-        makecontext(&main_thread.context, VOID_FUNCTION(start), 1, arg);
     }
 
     TCB_t *th = malloc(sizeof(TCB_t));
@@ -219,16 +209,14 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     // th->context.uc_stack;
     // th->context.uc_mcontext;
     //
-    makecontext(&(main_thread.context), VOID_FUNCTION(start), 1, arg);
-
     // Associa uma função ao contexto
     makecontext(&th->context, VOID_FUNCTION(start), 1, arg);
 
     // Depois de ser criada, a thread entre para sua fila de aptos
     // correspondente
-    FILA2 *queue = ready_queues[priority];
+    FILA2 *queue = ready[priority];
     th->state = READY;
-    push(queue, th);
+    push_ready(th);
 
     return th->tid;
 }
@@ -252,7 +240,8 @@ TCB_t *cdestroy(TCB_t *thread) {
 //  char *name :: Endereço aonde serão copiados os nomes dos alunos
 //  int size :: Limite de caracteres que serão copiados para o endereço
 //------------------------------------------------------------------------------
-int cidentify(char *name, int size) {
+int cidentify(char *name, int size)
+{
     // TODO: Incluir os dados do último integrante.
     char *names =
         "Carlos Pinheiro -- 109910\n"
@@ -262,35 +251,55 @@ int cidentify(char *name, int size) {
 }
 
 
-//------------------------------------------------------------------------------
-// Funções da fila
-//------------------------------------------------------------------------------
-int queue_create(PFILA2 queue) {
-    return CreateFila2(queue);
+//==============================================================================
+// Filas de Aptos
+//==============================================================================
+int push_ready(TCB_t *thread)
+{
+    PFILA2 queue = ready[thread->prio];
+    return AppendFila2(queue, (void *) thread);
 }
 
-
-// Coloca a thread "th" no final da fila "queue"
-int push(PFILA2 queue, TCB_t *th) {
-    int ret = AppendFila2(queue, (void *) th);
-    FirstFila2(queue);
-    return ret;
-}
-
-
-// Retorna o primeiro elemento de "queue" e o remove da fila.
-TCB_t *shift(PFILA2 queue) {
-    FirstFila2(queue);
-    TCB_t *th = (TCB_t *) GetAtIteratorFila2(queue);
-    DeleteAtIteratorFila2(queue);
+//------------------------------------------------------------------------------
+// Retorna o primeiro elemento de menor prioridade das filas de aptos e remove
+// esse elemento das filas.
+//
+// Caso não haja mais nenhum elemento nas filas, retorna NULL.
+//------------------------------------------------------------------------------
+TCB_t *shift_ready()
+{
+    TCB_t *th = NULL;
+    int i;
+    for (i = 0; i < 4; ++i) {
+        if (FirstFila2(ready[i])) {
+            th = GetAtIteratorFila2(ready[i]);
+            DeleteAtIteratorFila2(ready[i]);
+            break;
+        }
+    }
     return th;
 }
 
-
-bool empty(PFILA2 queue) {
-    // Quando não consegue "setar" para o primeiro elemento da fila,
-    // então o resultado é diferente de zero e a fila está vazia.
-    return FirstFila2(queue) != 0;
+//------------------------------------------------------------------------------
+// Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
+// elemento.
+// 
+// Caso ele não seja encontrado, nada acontece e NULL é retornado.
+//------------------------------------------------------------------------------
+TCB_t *remove_ready(int tid)
+{
+    TCB_t *th = NULL;
+    int i;
+    for (i = 0; i < 4; ++i) {
+        FirstFila2(ready[i]);
+        do {
+            th = GetAtIteratorFila2(ready[i]);
+            if (th->tid == tid) {
+                DeleteAtIteratorFila2(ready[i]);
+                return th;
+            }
+        } while (NextFila2(ready[i]));
+    }
+    return th;
 }
-
 
