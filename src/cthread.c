@@ -62,6 +62,65 @@ TCB_t *running_thread;    // Executando
 // Funções
 //==============================================================================
 
+
+//------------------------------------------------------------------------------
+//Funcoes de inicialização
+//------------------------------------------------------------------------------
+
+int init_main_thread() {
+	//TODO: implementar a inicializacao da thread main.
+	
+	return SUCCESS_CODE;
+}
+
+int init_end_context() {
+	//TODO: implementar a inicializacao do contexto de finalizacao de thread.
+	return SUCCESS_CODE;
+}
+
+//------------------------------------------------------------------------------
+// Esta função inicializa todas as variáveis globais das quais as outras
+// funções dependem.  Deve ser chamada nas outras funções, por garantia.
+//------------------------------------------------------------------------------
+int init() {
+	if (!initialized_globals) {
+
+		initialized_globals = true;
+
+		// inicializar a thread main e colocar em executando.
+		if(init_main_thread() != SUCCESS_CODE)
+			return ERROR_CODE;
+
+		// inicializar o contexto de finalizacao de thread.
+		if(init_end_context() != SUCCESS_CODE)
+			return ERROR_CODE;
+
+		// O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
+		// partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
+
+		// Inicializa as diversas filas de threads
+		size_t queue_size = sizeof(struct sFila2);
+		int i;
+		for (i = 0; i < 4; ++i) {
+		ready[i] = malloc(queue_size);
+		CreateFila2(ready[i]);
+		}
+		blocked_join = (FILA2 *)malloc(sizeof(FILA2));
+	
+		if(CreateFila2(blocked_join)!=SUCCESS_CODE)
+			return ERROR_CODE;
+
+		blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
+		if(CreateFila2(blocked_semaphor)!=SUCCESS_CODE)
+			return ERROR_CODE;
+
+		return SUCCESS_CODE;
+	}
+	return SUCESS_CODE;
+}
+
+
+
 //------------------------------------------------------------------------------
 //Funcoes da lista de bloqueados cjoin
 //------------------------------------------------------------------------------
@@ -156,62 +215,7 @@ TCB_t* get_thread_from_blocked_semaphor(int tid) {
 }
 
 
-//------------------------------------------------------------------------------
-// Esta função inicializa todas as variáveis globais das quais as outras
-// funções dependem.  Deve ser chamada nas outras funções, por garantia.
-//------------------------------------------------------------------------------
-void init() {
-    if (initialized_globals) {
-        return;
-    }
 
-    // TODO: Criar a thread da main e colocar em executando.
-
-    // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
-    // partir do tipo PFILA2, que é um ponteiro.
-
-    // Inicializa as diversas filas de threads
-    size_t queue_size = sizeof(struct sFila2);
-    int i;
-    for (i = 0; i < 4; ++i) {
-        ready[i] = malloc(queue_size);
-        CreateFila2(ready[i]);
-    }
-    blocked_join = malloc(queue_size);
-    CreateFila2(blocked_join);
-
-    blocked_semaphor = malloc(queue_size);
-    CreateFila2(blocked_semaphor);
-
-    initialized_globals = true;
-}
-
-
-//------------------------------------------------------------------------------
-// Inicializa um semáforo
-//------------------------------------------------------------------------------
-int csem_init(csem_t *sem, int count) {
-	if (sem == NULL) {
-		//Nao e possivel inicializar um ponteiro para um semaforo nulo.
-		return CSEM_INIT_ERROR;
-	}
-	if (sem->fila != NULL){
-		//nao e possivel inicializar um semaforo ja inicializado
-		return CSEM_INIT_ERROR;
-	}
-	// Inicializa a contagem do semáforo
-	sem->count = count;
-
-	// Inicializa a fila referente ao semáforo
-	sem->fila = (FILA2)malloc(sizeof(FILA2));
-	
-	//insere o semáforo na lista de semáforos
-	if(insert_semaphore_on_blocked_semaphor(csem_t *sem)==0){
-		return CreateFila2(sem->fila);
-	}
-	else
-		return ERROR_CODE;
-}
 
 
 //------------------------------------------------------------------------------
@@ -221,6 +225,75 @@ int current_tid = 0;
 int generate_tid() {
     return ++current_tid;
 }
+
+
+
+
+//------------------------------------------------------------------------------
+// Destrói a thread.
+// NOTE: Talvez não seja necessária
+//------------------------------------------------------------------------------
+TCB_t *cdestroy(TCB_t *thread) {
+    free(thread);
+    thread = NULL;
+    return thread;
+}
+
+//==============================================================================
+// Filas de Aptos
+//==============================================================================
+int push_ready(TCB_t *thread)
+{
+    PFILA2 queue = ready[thread->prio];
+    return AppendFila2(queue, (void *) thread);
+}
+
+//------------------------------------------------------------------------------
+// Retorna o primeiro elemento de menor prioridade das filas de aptos e remove
+// esse elemento das filas.
+//
+// Caso não haja mais nenhum elemento nas filas, retorna NULL.
+//------------------------------------------------------------------------------
+TCB_t *shift_ready()
+{
+    TCB_t *th = NULL;
+    int i;
+    for (i = 0; i < 4; ++i) {
+        if (FirstFila2(ready[i])) {
+            th = GetAtIteratorFila2(ready[i]);
+            DeleteAtIteratorFila2(ready[i]);
+            break;
+        }
+    }
+    return th;
+}
+
+//------------------------------------------------------------------------------
+// Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
+// elemento.
+// 
+// Caso ele não seja encontrado, nada acontece e NULL é retornado.
+//------------------------------------------------------------------------------
+TCB_t *remove_ready(int tid)
+{
+    TCB_t *th = NULL;
+    int i;
+    for (i = 0; i < 4; ++i) {
+        FirstFila2(ready[i]);
+        do {
+            th = GetAtIteratorFila2(ready[i]);
+            if (th->tid == tid) {
+                DeleteAtIteratorFila2(ready[i]);
+                return th;
+            }
+        } while (NextFila2(ready[i]));
+    }
+    return th;
+}
+
+//==============================================================================
+// Funções da biblioteca cthread
+//==============================================================================
 
 /*
  * =============================================================================
@@ -325,15 +398,42 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     return th->tid;
 }
 
+int csetprio(int tid, int prio){
+	return SUCCESS_CODE;
+}
+
+int cyield(void){
+	return SUCCESS_CODE;
+}
+
+int cjoin(int tid){
+	return SUCCESS_CODE;
+}
 
 //------------------------------------------------------------------------------
-// Destrói a thread.
-// NOTE: Talvez não seja necessária
+// Inicializa um semáforo
 //------------------------------------------------------------------------------
-TCB_t *cdestroy(TCB_t *thread) {
-    free(thread);
-    thread = NULL;
-    return thread;
+int csem_init(csem_t *sem, int count) {
+	if (sem == NULL) {
+		//Nao e possivel inicializar um ponteiro para um semaforo nulo.
+		return CSEM_INIT_ERROR;
+	}
+	if (sem->fila != NULL){
+		//nao e possivel inicializar um semaforo ja inicializado
+		return CSEM_INIT_ERROR;
+	}
+	// Inicializa a contagem do semáforo
+	sem->count = count;
+
+	// Inicializa a fila referente ao semáforo
+	sem->fila = (FILA2)malloc(sizeof(FILA2));
+	
+	//insere o semáforo na lista de semáforos
+	if(insert_semaphore_on_blocked_semaphor(csem_t *sem)==0){
+		return CreateFila2(sem->fila);
+	}
+	else
+		return ERROR_CODE;
 }
 
 /*
@@ -360,6 +460,7 @@ int cwait(csem_t *sem) {
     		//executa o escalonador.
 	}
 }
+
 /*
 	Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
 */
@@ -382,7 +483,6 @@ int csignal(csem_t *sem) {
 	}
 }
 
-
 //------------------------------------------------------------------------------
 // Copia o nome e número do cartão dos alunos para um endereço fornecido
 //
@@ -400,58 +500,4 @@ int cidentify(char *name, int size)
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
 
-
-
-
-//==============================================================================
-// Filas de Aptos
-//==============================================================================
-int push_ready(TCB_t *thread)
-{
-    PFILA2 queue = ready[thread->prio];
-    return AppendFila2(queue, (void *) thread);
-}
-
-//------------------------------------------------------------------------------
-// Retorna o primeiro elemento de menor prioridade das filas de aptos e remove
-// esse elemento das filas.
-//
-// Caso não haja mais nenhum elemento nas filas, retorna NULL.
-//------------------------------------------------------------------------------
-TCB_t *shift_ready()
-{
-    TCB_t *th = NULL;
-    int i;
-    for (i = 0; i < 4; ++i) {
-        if (FirstFila2(ready[i])) {
-            th = GetAtIteratorFila2(ready[i]);
-            DeleteAtIteratorFila2(ready[i]);
-            break;
-        }
-    }
-    return th;
-}
-
-//------------------------------------------------------------------------------
-// Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
-// elemento.
-// 
-// Caso ele não seja encontrado, nada acontece e NULL é retornado.
-//------------------------------------------------------------------------------
-TCB_t *remove_ready(int tid)
-{
-    TCB_t *th = NULL;
-    int i;
-    for (i = 0; i < 4; ++i) {
-        FirstFila2(ready[i]);
-        do {
-            th = GetAtIteratorFila2(ready[i]);
-            if (th->tid == tid) {
-                DeleteAtIteratorFila2(ready[i]);
-                return th;
-            }
-        } while (NextFila2(ready[i]));
-    }
-    return th;
-}
 
