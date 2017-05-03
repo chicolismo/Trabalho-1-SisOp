@@ -402,7 +402,7 @@ int csetprio(int tid, int prio){
 	return SUCCESS_CODE;
 }
 
-int cyield(void){
+int cyield(){
 	return SUCCESS_CODE;
 }
 
