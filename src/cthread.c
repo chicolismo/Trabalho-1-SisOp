@@ -62,7 +62,33 @@ TCB_t *running_thread;    // Executando
 // Funções
 //==============================================================================
 
+//------------------------------------------------------------------------------
+//Funcoes da lista de bloqueados cjoin
+//------------------------------------------------------------------------------
+int blocked_join_insert(struct Duplacjoin *thread){//essa estrutura Duplacjoin deve ainda ser definida
+	//funcao que insere uma dupla thread,tid esperado na lista de bloq. cjoin.
+	//provavelmente a funcao seja so isso.
+	return AppendFila2(blocked_join, thread);
+}
 
+int blocked_join_remove(struct Duplacjoin *thread) { //essa estrutura duplacjoin deve ser definida
+	//funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
+	//bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
+	return 0;
+}
+
+TCB_t* blocked_join_get_thread(int tid) {
+	//funcao que verifica a existencia de uma thread na fila de bloqueados por cjoin.
+	//retorna um ponteiro para a thread caso a encontre, e um ponteiro NULL caso a thread nao seja encontrada.
+	return NULL;
+}
+
+struct Duplacjoin* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura duplacjoin ainda deve ser definida.
+	//funcao que procura por um tid esperado na lista de duplas da fila cjoin,
+	//pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
+	//retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
+	return NULL;
+}
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
@@ -105,9 +131,29 @@ TCB_t* get_thread_from_blocked_semaphor(int tid) {
     	//funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
     	//NAO REMOVE nenhuma thread, Retorna um ponteiro para a thread se for bem sucedida
 	//e um ponteiro NULL em caso de erro
-    return 0;	
+	
+	if (FirstFila2(blocked_semaphor) == 0) {
+		do { //iteracao para varrer a lista de semaforos.
+			csem_t *value = (csem_t *)GetAtIteratorFila2(semaphore_list);
+			if(value == NULL) break; //precisa desse teste pois caso value seja igual a NULL, o ponteiro de
+			//value->fila apontara para um endereco nao conhecido e acontecera segmentation fault.
+			if(FirstFila2(value->fila)==0){
+				do{//iteracao para varrer a fila de bloqueados do semaforo
+					TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
+					if(value2 == NULL) break;//teste necessario, pois caso value2 seja igual a NULL,
+					//acontecera segmentation fault no ponteiro value2->tid
+					if (value2->tid == tid)//encontrou a thread procurada.
+						return value2;
+				}while (NextFila2(value->fila) == 0);
+			}
+		} while (NextFila2(blocked_semaphor) == 0);
+		//Nao encontrou a thread, retornara um ponteiro NULL
+		return NULL;
+	} else { 
+		// Fila de semaforos nao existe, retorna ponteiro nulo.
+		return NULL;
+	}
 }
-
 
 
 //------------------------------------------------------------------------------
