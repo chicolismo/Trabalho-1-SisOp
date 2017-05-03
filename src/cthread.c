@@ -360,53 +360,45 @@ TCB_t *remove_ready(int tid)
 //  Quando executada corretamente: retorna um valor positivo, que representa o
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
-int ccreate(void *(*start)(void *), void *arg, int priority) {
-    // Será que esta pilha deveria ser compartilhada???
-    byte *context_stack = malloc(STACK_SIZE);
 
-    if (!initialized_globals) {
-        init();
-    }
+int ccreate(void* (*start)(void*), void *arg, int priority) {
+	init();
+	
+	int new_tid = generate_tid();
+	
+	TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
+	thread->tid = new_tid;
+	thread->prio = priority;
+	thread->state = PROCST_CRIACAO;
+	
+	getcontext(&(thread->context));
+	
+	//TODO:Descobrir o que fazer com o resto do contexto.
+	// th->context.uc_link  ->> contexto de finalização
+    	// th->context.uc_sigmask ->> man: uc_sigmask is the set of signals blocked in this context, acho que nao precisa setar nada.
+    	// th->context.uc_stack;  ->> pilha usada pelo contexto, precisa um set em uc_stack.ss_size
+    	// th->context.uc_mcontext ->> man: uc_mcontext is the machine-specific representation of the saved
+       	// context, that includes the calling thread's machine registers. Acho que a propria funcao de getcontext ja faz o set.
 
-    TCB_t *th = malloc(sizeof(TCB_t));
-    if (th == NULL) {
-        return CCREATE_ERROR;
-    }
-    th->state = NEW;
-    th->tid = generate_tid();
-    th->prio = priority;
+	makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
+	
+	push_ready(thread);
 
-    // Inicializa o contexto da thread
-    getcontext(&th->context);
-    // TODO: Verificar se é isso mesmo
-    // Descobrir o que fazer com o resto do contexto.
-    //
-    // th->context.uc_link;
-    // th->context.uc_sigmask;
-    // th->context.uc_stack;
-    // th->context.uc_mcontext;
-    //
-    // Associa uma função ao contexto
-    makecontext(&th->context, VOID_FUNCTION(start), 1, arg);
-
-    // Depois de ser criada, a thread entre para sua fila de aptos
-    // correspondente
-    FILA2 *queue = ready[priority];
-    th->state = READY;
-    push_ready(th);
-
-    return th->tid;
+	return new_tid;
 }
 
 int csetprio(int tid, int prio){
+	init();
 	return SUCCESS_CODE;
 }
 
 int cyield(){
+	init();
 	return SUCCESS_CODE;
 }
 
 int cjoin(int tid){
+	init();
 	return SUCCESS_CODE;
 }
 
@@ -414,6 +406,7 @@ int cjoin(int tid){
 // Inicializa um semáforo
 //------------------------------------------------------------------------------
 int csem_init(csem_t *sem, int count) {
+	init();
 	if (sem == NULL) {
 		//Nao e possivel inicializar um ponteiro para um semaforo nulo.
 		return CSEM_INIT_ERROR;
@@ -441,6 +434,7 @@ int csem_init(csem_t *sem, int count) {
 	coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
 */
 int cwait(csem_t *sem) {
+	init();
 	
 	if ((sem == NULL) || (sem->fila == NULL)) {
 		// Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
@@ -465,6 +459,7 @@ int cwait(csem_t *sem) {
 	Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
 */
 int csignal(csem_t *sem) {
+	init();
 	if ((sem == NULL) || (sem->fila == NULL)) {
 		//Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
 		return ERROR_CODE;
