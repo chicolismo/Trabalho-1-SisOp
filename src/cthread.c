@@ -39,6 +39,11 @@ typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
 #define CIDENTIFY_ERROR -1
 
 
+//Public Functions use
+#define SUCCESS_CODE 0
+#define ERROR_CODE -1
+
+
 //==============================================================================
 // Globais
 //==============================================================================
@@ -63,20 +68,46 @@ TCB_t *running_thread;    // Executando
 //------------------------------------------------------------------------------
 
 int insert_semaphore_on_blocked_semaphor(csem_t *sem){
-    //funcao que insere um semaforo na lista de semaforos criados.
-    return 0;
+    	//funcao que insere um semaforo na lista de semaforos criados.
+	//retorna 0 quando a insercao e bem sucedida e -1 quando ha erros.
+	
+	if (FirstFila2(blocked_semaphor) == 0) {
+		do {	
+		csem_t *value = (csem_t *)GetAtIteratorFila2(semaphore_list);
+		if (value != NULL && value == sem) {
+			//semaforo ja esta na fila, portanto nao ha insercao e retorna codigo de sucesso.
+			return SUCCESS_CODE;
+			}
+		} while (NextFila2(blocked_semaphor) == 0);
+		//caso o semaforo nao esteja inserido, ele eh entao inserido na fila.
+		return AppendFila2(blocked_semaphor, sem);
+		
+		
+	} else {
+		//caso seja o primeiro elemento, o semaforo sem eh simplesmente inserido.
+		return AppendFila2(blocked_semaphor, sem);
 }
 
 TCB_t* get_first_of_semaphore_queue(csem_t *sem) {
-    //funcao que remove e retorna o primeiro elemento da fila de um semaforo
-    return 0;	
+    	//funcao que remove e retorna o primeiro elemento da fila de um semaforo
+	//retorna um ponteiro para a thread se a funcao for bem sucedida
+	//e um ponteiro NULL em caso de thread nao existente.
+	
+	if (FirstFila2(sem->fila) == 0) {
+		TCB_t *value = (TCB_t *)GetAtIteratorFila2(sem->fila);
+		DeleteAtIteratorFila2(sem->fila);
+		return value;
+		
+	}else return NULL;	
 }
 
 TCB_t* get_thread_from_blocked_semaphor(int tid) {
-    //funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
-    //NAO REMOVE nenhuma thread, somente retorna um ponteiro a ela
+    	//funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
+    	//NAO REMOVE nenhuma thread, Retorna um ponteiro para a thread se for bem sucedida
+	//e um ponteiro NULL em caso de erro
     return 0;	
 }
+
 
 
 //------------------------------------------------------------------------------
@@ -114,7 +145,7 @@ void init() {
 // Inicializa um semáforo
 //------------------------------------------------------------------------------
 int csem_init(csem_t *sem, int count) {
-    // TODO: Descobrir como seria um erro.
+    // TODO: Provavelmente esta pronta.
     if (sem == NULL) {
         //Nao e possivel inicializar um ponteiro para um semaforo nulo.
         return CSEM_INIT_ERROR;
@@ -127,7 +158,7 @@ int csem_init(csem_t *sem, int count) {
     sem->count = count;
     
     // Inicializa a fila referente ao semáforo
-    sem->fila = (FILA2)malloc(sizeof(FILA2)); // PFILA2 é um tipo ponteiro
+    sem->fila = (FILA2)malloc(sizeof(FILA2));
     return CreateFila2(sem->fila);
 }
 
@@ -272,10 +303,10 @@ int cwait(csem_t *sem) {
 	} else {
 		// O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
 		sem->count -= 1;
-        //altera o estado da thread ativa para bloqueado.
+        	//altera o estado da thread ativa para bloqueado.
 		//insere na fila de bloqueados do semaforo a thread ativa.
 
-    	//executa o escalonador.
+    		//executa o escalonador.
 	}
 }
 /*
@@ -289,14 +320,15 @@ int csignal(csem_t *sem) {
 	}
 
 	sem->count += 1;
-	//TCB_t *thread = (TCB_t *)primeira_thread_bloqueada_no_semaforo(sem);	
-	/*if (ha thread bloqueada / sem->fila != NULL) {
-		estado da thread e modificado para APTO. --- thread->state = PROCST_APTO;
-		return funcao_de_inserir_na_fila_de_aptos(thread);
+	TCB_t *thread = (TCB_t *)get_first_of_semaphore_queue(sem);	
+	if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
+		//estado da thread e modificado para APTO
+		thread->state = PROCST_APTO;
+		return;//deve retornar funcao_de_inserir_na_fila_de_aptos(thread);
 	} else {
-		O semaforo esta livre. Segue execucao.
+		//O semaforo esta livre. Segue execucao.
 		return SUCCESS_CODE;
-	}*/
+	}
 }
 
 
@@ -309,10 +341,10 @@ int csignal(csem_t *sem) {
 //------------------------------------------------------------------------------
 int cidentify(char *name, int size)
 {
-    // TODO: Incluir os dados do último integrante.
     char *names =
         "Carlos Pinheiro -- 109910\n"
-        "Bruno Feil      -- 216631";
+        "Bruno Feil      -- 216631"
+	"Hugo Constantinopolos -- 208897;
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
