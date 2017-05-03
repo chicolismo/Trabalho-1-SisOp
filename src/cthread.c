@@ -191,21 +191,26 @@ void init() {
 // Inicializa um semáforo
 //------------------------------------------------------------------------------
 int csem_init(csem_t *sem, int count) {
-    // TODO: Provavelmente esta pronta.
-    if (sem == NULL) {
-        //Nao e possivel inicializar um ponteiro para um semaforo nulo.
-        return CSEM_INIT_ERROR;
-    }
-    if (sem->fila != NULL){
-        //nao e possivel inicializar um semaforo ja inicializado
-        return CSEM_INIT_ERROR;
-    }
-    // Inicializa a contagem do semáforo
-    sem->count = count;
-    
-    // Inicializa a fila referente ao semáforo
-    sem->fila = (FILA2)malloc(sizeof(FILA2));
-    return CreateFila2(sem->fila);
+	if (sem == NULL) {
+		//Nao e possivel inicializar um ponteiro para um semaforo nulo.
+		return CSEM_INIT_ERROR;
+	}
+	if (sem->fila != NULL){
+		//nao e possivel inicializar um semaforo ja inicializado
+		return CSEM_INIT_ERROR;
+	}
+	// Inicializa a contagem do semáforo
+	sem->count = count;
+
+	// Inicializa a fila referente ao semáforo
+	sem->fila = (FILA2)malloc(sizeof(FILA2));
+	
+	//insere o semáforo na lista de semáforos
+	if(insert_semaphore_on_blocked_semaphor(csem_t *sem)==0){
+		return CreateFila2(sem->fila);
+	}
+	else
+		return ERROR_CODE;
 }
 
 
