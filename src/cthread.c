@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ucontext.h>
+#include <stdio.h>
 #include "../include/cthread.h"
 #include "../include/cdata.h"
 #include "../include/support.h"
@@ -15,7 +16,7 @@
 // Tipos
 //=============================================================================
 typedef char byte;
-typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;
+//typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;  << Já está definido nos arquivos do professor.
 
 
 //=============================================================================
@@ -56,7 +57,7 @@ bool initialized_globals = false;
 PFILA2 ready[4];          // Quatro filas de aptos
 PFILA2 blocked_join;      // Bloqueados esperando outra thread terminar
 PFILA2 blocked_semaphor;  // Bloqueados esperando semáforo
-TCB_t *running_thread;    // Executando
+TCB_t *running_thread = NULL;    // Executando
 
 //==============================================================================
 // Funções
@@ -124,13 +125,13 @@ int init() {
 //------------------------------------------------------------------------------
 //Funcoes da lista de bloqueados cjoin
 //------------------------------------------------------------------------------
-int blocked_join_insert(struct Duplacjoin *thread){//essa estrutura Duplacjoin deve ainda ser definida
+int blocked_join_insert(DUPLA_t *thread){//essa estrutura Duplacjoin está definida em queue.h
 	//funcao que insere uma dupla thread,tid esperado na lista de bloq. cjoin.
 	//provavelmente a funcao seja so isso.
 	return AppendFila2(blocked_join, thread);
 }
 
-int blocked_join_remove(struct Duplacjoin *thread) { //essa estrutura duplacjoin deve ser definida
+int blocked_join_remove(DUPLA_t *thread) { //essa estrutura Duplacjoin está definida em queue.h
 	//funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
 	//bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
 	return 0;
@@ -142,7 +143,7 @@ TCB_t* blocked_join_get_thread(int tid) {
 	return NULL;
 }
 
-struct Duplacjoin* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura duplacjoin ainda deve ser definida.
+DUPLA_t* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacjoin está definida em queue.h
 	//funcao que procura por um tid esperado na lista de duplas da fila cjoin,
 	//pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
 	//retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
@@ -214,6 +215,37 @@ TCB_t* get_thread_from_blocked_semaphor(int tid) {
 		return NULL;
 	}
 }
+
+int debug_blocked_semaphor(){
+	int i = 1;
+	int t;
+    	//função que imprime a lista de semaforos em detalhes.
+	printf("========== DEBUG SEMAPHORE LIST ==========\n");
+	if (FirstFila2(blocked_semaphor) == 0) {
+		do {
+		printf("==                                      ==\n");
+		csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);	
+		if (value != NULL) {
+			t=0;
+			do{
+				TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
+				if(value2 != NULL) t++;
+			}while (NextFila2(value->fila) == 0);
+			printf("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t);
+			i++;	
+			}
+		} while (NextFila2(blocked_semaphor) == 0);
+		
+		
+	} else {
+		printf("========== NÃO HÁ LISTA SEMÁFORO =========\n");
+			
+	}
+	printf("========== DEBUG SEMAPHORE LIST ==========\n");
+	return 0;
+}
+
+
 
 
 
@@ -409,20 +441,21 @@ int cjoin(int tid){
 int csem_init(csem_t *sem, int count) {
 	init();
 	if (sem == NULL) {
-		//Nao e possivel inicializar um ponteiro para um semaforo nulo.
+		//printf("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n");
 		return CSEM_INIT_ERROR;
 	}
 	if (sem->fila != NULL){
-		//nao e possivel inicializar um semaforo ja inicializado
+		//printf("Nao e possivel inicializar um semaforo ja inicializado.\n");
 		return CSEM_INIT_ERROR;
 	}
-	// Inicializa a contagem do semáforo
+	//printf("Inicializando a contagem do semáforo\n");
 	sem->count = count;
 
-	// Inicializa a fila referente ao semáforo
+	//printf("Inicializando a fila referente ao semáforo.\n");
 	sem->fila = (FILA2 *)malloc(sizeof(FILA2));
 	
 	//insere o semáforo na lista de semáforos
+	//printf("inserindo semaforo na fila de semaforos.\n");
 	if(insert_semaphore_on_blocked_semaphor(sem)==0){
 		return CreateFila2(sem->fila);
 	}
@@ -454,6 +487,7 @@ int cwait(csem_t *sem) {
 
     		//executa o escalonador.
 	}
+	return SUCCESS_CODE;
 }
 
 /*

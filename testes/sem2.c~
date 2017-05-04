@@ -1,0 +1,34 @@
+#include<stdlib.h>
+#include <stdio.h>
+
+#include "../include/support.h"
+#include "../include/cthread.h"
+
+//TESTE DA ESTRUTURA DE SEMAFOROS.
+
+
+
+void main(){
+
+csem_t sem1;
+csem_t sem2;
+csem_t sem3;
+
+if(csem_init(sem1, 1)==0)
+	printf("semaforo 1 inicializado.\n");
+else return;
+
+if(csem_init(sem2, 2)==0)
+	printf("semaforo 2 inicializado.\n");
+else return;
+
+if(csem_init(sem3, 3)==0)
+	printf("semaforo 3 inicializado.\n");
+else return;
+
+return;
+
+
+
+}
+
