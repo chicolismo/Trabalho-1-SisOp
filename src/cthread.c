@@ -116,7 +116,7 @@ int init() {
 
 		return SUCCESS_CODE;
 	}
-	return SUCESS_CODE;
+	return SUCCESS_CODE;
 }
 
 
@@ -158,7 +158,7 @@ int insert_semaphore_on_blocked_semaphor(csem_t *sem){
 	
 	if (FirstFila2(blocked_semaphor) == 0) {
 		do {	
-		csem_t *value = (csem_t *)GetAtIteratorFila2(semaphore_list);
+		csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
 		if (value != NULL && value == sem) {
 			//semaforo ja esta na fila, portanto nao ha insercao e retorna codigo de sucesso.
 			return SUCCESS_CODE;
@@ -171,6 +171,7 @@ int insert_semaphore_on_blocked_semaphor(csem_t *sem){
 	} else {
 		//caso seja o primeiro elemento, o semaforo sem eh simplesmente inserido.
 		return AppendFila2(blocked_semaphor, sem);
+	}
 }
 
 TCB_t* get_first_of_semaphore_queue(csem_t *sem) {
@@ -193,7 +194,7 @@ TCB_t* get_thread_from_blocked_semaphor(int tid) {
 	
 	if (FirstFila2(blocked_semaphor) == 0) {
 		do { //iteracao para varrer a lista de semaforos.
-			csem_t *value = (csem_t *)GetAtIteratorFila2(semaphore_list);
+			csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
 			if(value == NULL) break; //precisa desse teste pois caso value seja igual a NULL, o ponteiro de
 			//value->fila apontara para um endereco nao conhecido e acontecera segmentation fault.
 			if(FirstFila2(value->fila)==0){
@@ -419,10 +420,10 @@ int csem_init(csem_t *sem, int count) {
 	sem->count = count;
 
 	// Inicializa a fila referente ao semáforo
-	sem->fila = (FILA2)malloc(sizeof(FILA2));
+	sem->fila = (FILA2 *)malloc(sizeof(FILA2));
 	
 	//insere o semáforo na lista de semáforos
-	if(insert_semaphore_on_blocked_semaphor(csem_t *sem)==0){
+	if(insert_semaphore_on_blocked_semaphor(sem)==0){
 		return CreateFila2(sem->fila);
 	}
 	else
@@ -471,7 +472,7 @@ int csignal(csem_t *sem) {
 	if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
 		//estado da thread e modificado para APTO
 		thread->state = PROCST_APTO;
-		return;//deve retornar funcao_de_inserir_na_fila_de_aptos(thread);
+		return push_ready(thread);
 	} else {
 		//O semaforo esta livre. Segue execucao.
 		return SUCCESS_CODE;
@@ -487,10 +488,8 @@ int csignal(csem_t *sem) {
 //------------------------------------------------------------------------------
 int cidentify(char *name, int size)
 {
-    char *names =
-        "Carlos Pinheiro -- 109910\n"
-        "Bruno Feil      -- 216631"
-	"Hugo Constantinopolos -- 208897;
+    char *names = "Carlos Pinheiro -- 109910\nBruno Feil      -- 216631\nHugo Constantinopolos -- 208897";
+	
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
