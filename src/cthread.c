@@ -62,6 +62,10 @@ FILA2 *blocked_semaphor;  // Bloqueados esperando semáforo
 TCB_t *running_thread = NULL;    // Executando
 ucontext_t *ending_ctx = NULL;
 
+int dispatch() {
+	return SUCCESS_CODE;
+}
+
 void end_thread() {
 }
 
@@ -229,6 +233,11 @@ DUPLA_t *blocked_join_get_thread_waiting_for(int
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
+
+int semaphore_queue_insert_thread(csem_t *sem, TCB_t *thread) {
+	//função que insere uma thread na fila de bloqueados de um semáforo sem.
+	return AppendFila2(sem->fila, thread);
+}
 
 int insert_semaphore_on_blocked_semaphor(csem_t *sem) {
     //funcao que insere um semaforo na lista de semaforos criados.
@@ -417,6 +426,23 @@ FindResult *ready_find(int tid) {
     return result;
 }
 
+TCB_t *ready_get_thread(int tid) {
+	//funçao que retorna uma thread da fila de aptos a partir de uma tid.
+	//Nao remove a thread, apenas retorna um ponteiro para ela caso exista, ou NULL caso nao exista
+	TCB_t *thread = NULL;
+	int i;
+	for (i = 0; i < 4; ++i) {
+		FirstFila2(ready[i]);
+		do {
+			thread = (TCB_t *)GetAtIteratorFila2(ready[i]);
+			if (thread->tid == tid) {
+				return thread;
+			}
+		} while (NextFila2(ready[i]));
+	}
+	return NULL;
+}
+
 
 /*
  * Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
@@ -552,12 +578,39 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
 
 int csetprio(int tid, int prio) {
     init();
+	bool thread_in_ready = false;
+
+	if (prio < 0 || prio > 3) {
+		//prioridade nao esta no intervalo [0,3]
+		return ERROR_CODE;
+	}
+	TCB_t *thread = NULL;
+	if (thread = blocked_join_get_thread(tid) != NULL) {
+		if (thread = get_thread_from_blocked_semaphor(tid) != NULL) {
+			if (ready_get_thread(tid) != NULL) {
+				//Thread a ser modificada não existe.
+				return ERROR_CODE;
+			}else{//thread encontrada na fila de aptos.
+				thread_in_ready = true;
+			}
+		}
+	}
+	//thread existe
+
+	if (thread_in_ready) {
+		//TODO: remoção da fila de aptos, troca de prioridade e reinserçao na fila de aptos.
+	}
+	else{
+		thread->prio = prio;
+	}
     return SUCCESS_CODE;
 }
 
 int cyield() {
     init();
-    return SUCCESS_CODE;
+
+	running_thread->state = PROCST_APTO;
+	return dispatch();
 }
 
 int cjoin(int tid) {
@@ -599,27 +652,26 @@ int csem_init(csem_t *sem, int count) {
     coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
 */
 int cwait(csem_t *sem) {
-    init();
+init();
 
-    if ((sem == NULL) || (sem->fila == NULL)) {
-        // Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
-        return ERROR_CODE;
-    }
+if ((sem == NULL) || (sem->fila == NULL)) {
+    // Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+    return ERROR_CODE;
+}
 
-    if (sem->count > 0) {
-        // O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
-        sem->count -= 1;
-        return SUCCESS_CODE;
-    }
-    else {
-        // O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
-        sem->count -= 1;
-        //altera o estado da thread ativa para bloqueado.
-        //insere na fila de bloqueados do semaforo a thread ativa.
-
-        //executa o escalonador.
-    }
+if (sem->count > 0) {
+    // O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
+    sem->count -= 1;
     return SUCCESS_CODE;
+}
+else {
+    // O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
+    sem->count -= 1;
+	running_thread->state = PROCST_BLOQ;
+	semaphore_queue_insert_thread(sem, running_thread);
+	dispatch();
+}
+return SUCCESS_CODE;
 }
 
 /*
