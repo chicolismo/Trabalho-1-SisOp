@@ -369,7 +369,7 @@ TCB_t *ready_shift() {
 FindResult *ready_find(int tid) {
     FindResult *result = NULL;
     int i;
-    for (int i = 0; i < 4; ++i) {
+    for (i = 0; i < 4; ++i) {
         FirstFila2(ready[i]);
         do {
             if (((TCB_t *)GetAtIteratorFila2(ready[i]))->tid == tid) {
