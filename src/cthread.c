@@ -350,7 +350,7 @@ TCB_t *ready_shift() {
     int i;
     for (i = 0; i < 4; ++i) {
         if (FirstFila2(ready[i])) {
-            th = GetAtIteratorFila2(ready[i]);
+            th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
             break;
         }
