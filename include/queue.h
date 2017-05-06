@@ -3,12 +3,19 @@
 
 #include <stdbool.h>
 
-int push_ready(TCB_t *th);
+typedef struct FindResult {
+    NODE2 *node;
+    int queue_number;
+} FindResult;
+
+int ready_push(TCB_t *th);
+TCB_t *ready_shift();
+TCB_t *ready_remove(int tid);
+FindResult *ready_find(int tid);
+
 typedef struct dupla {
 	int waitedTid;
 	TCB_t* blockedThread;
 } DUPLA_t;
-TCB_t *shift_ready();
-TCB_t *remove_ready(int tid);
 
 #endif

@@ -1,3 +1,5 @@
+// vim: sw=4 ts=4 sts=4 expandtab foldenable foldmethod=syntax
+
 #ifdef __APPLE__
 #define _XOPEN_SOURCE 500 // Carlos: Gambiarra para não exibir avisos de "deprecated" na minha máquina.
 #endif
@@ -11,6 +13,7 @@
 #include "../include/cdata.h"
 #include "../include/support.h"
 #include "../include/queue.h"
+
 
 //=============================================================================
 // Tipos
@@ -50,19 +53,21 @@ typedef char byte;
 //==============================================================================
 bool initialized_globals = false;
 
-//------------------------------------------------------------------------------
 // As filas de threads.
 // Devem ser ponteiros para podermos usar CreateFila2.
-//------------------------------------------------------------------------------
-PFILA2 ready[4];          // Quatro filas de aptos
-PFILA2 blocked_join;      // Bloqueados esperando outra thread terminar
-PFILA2 blocked_semaphor;  // Bloqueados esperando semáforo
+FILA2 *ready[4];          // Quatro filas de aptos
+FILA2 *blocked_join;      // Bloqueados esperando outra thread terminar
+FILA2 *blocked_semaphor;  // Bloqueados esperando semáforo
 TCB_t *running_thread = NULL;    // Executando
 
 //==============================================================================
 // Funções
 //==============================================================================
 
+/*
+ * Esta função inicializa todas as variáveis globais das quais as outras
+ * funções dependem.  Deve ser chamada nas outras funções, por garantia.
+ */
 
 //------------------------------------------------------------------------------
 //Funcoes de inicialização
@@ -119,8 +124,6 @@ int init() {
 	}
 	return SUCCESS_CODE;
 }
-
-
 
 //------------------------------------------------------------------------------
 //Funcoes da lista de bloqueados cjoin
@@ -232,69 +235,80 @@ TCB_t* get_first_of_semaphore_queue(csem_t *sem) {
 	}else return NULL;	
 }
 
-TCB_t* get_thread_from_blocked_semaphor(int tid) {
-    	//funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
-    	//NAO REMOVE nenhuma thread, Retorna um ponteiro para a thread se for bem sucedida
-	//e um ponteiro NULL em caso de erro
-	
-	if (FirstFila2(blocked_semaphor) == 0) {
-		do { //iteracao para varrer a lista de semaforos.
-			csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
-			if(value == NULL) break; //precisa desse teste pois caso value seja igual a NULL, o ponteiro de
-			//value->fila apontara para um endereco nao conhecido e acontecera segmentation fault.
-			if(FirstFila2(value->fila)==0){
-				do{//iteracao para varrer a fila de bloqueados do semaforo
-					TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
-					if(value2 == NULL) break;//teste necessario, pois caso value2 seja igual a NULL,
-					//acontecera segmentation fault no ponteiro value2->tid
-					if (value2->tid == tid)//encontrou a thread procurada.
-						return value2;
-				}while (NextFila2(value->fila) == 0);
-			}
-		} while (NextFila2(blocked_semaphor) == 0);
-		//Nao encontrou a thread, retornara um ponteiro NULL
-		return NULL;
-	} else { 
-		// Fila de semaforos nao existe, retorna ponteiro nulo.
-		return NULL;
-	}
+TCB_t *get_thread_from_blocked_semaphor(int tid) {
+    //funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
+    //NAO REMOVE nenhuma thread, Retorna um ponteiro para a thread se for bem sucedida
+    //e um ponteiro NULL em caso de erro
+
+    if (FirstFila2(blocked_semaphor) == 0) {
+        do { //iteracao para varrer a lista de semaforos.
+            csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
+            if (value == NULL) {
+                break;    //precisa desse teste pois caso value seja igual a NULL, o ponteiro de
+            }
+            //value->fila apontara para um endereco nao conhecido e acontecera segmentation fault.
+            if (FirstFila2(value->fila) == 0) {
+                do { //iteracao para varrer a fila de bloqueados do semaforo
+                    TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
+                    if (value2 == NULL) {
+                        break;    //teste necessario, pois caso value2 seja igual a NULL,
+                    }
+                    //acontecera segmentation fault no ponteiro value2->tid
+                    if (value2->tid == tid) { //encontrou a thread procurada.
+                        return value2;
+                    }
+                }
+                while (NextFila2(value->fila) == 0);
+            }
+        }
+        while (NextFila2(blocked_semaphor) == 0);
+        //Nao encontrou a thread, retornara um ponteiro NULL
+        return NULL;
+    }
+    else {
+        // Fila de semaforos nao existe, retorna ponteiro nulo.
+        return NULL;
+    }
 }
 
-int debug_blocked_semaphor(){
-	int i = 1;
-	int t;
-    	//função que imprime a lista de semaforos em detalhes.
-	printf("========== DEBUG SEMAPHORE LIST ==========\n");
-	if (FirstFila2(blocked_semaphor) == 0) {
-		do {
-		printf("==                                      ==\n");
-		csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);	
-		if (value != NULL) {
-			t=0;
-			do{
-				TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
-				if(value2 != NULL) t++;
-			}while (NextFila2(value->fila) == 0);
-			printf("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t);
-			i++;	
-			}
-		} while (NextFila2(blocked_semaphor) == 0);
-		
-		
-	} else {
-		printf("========== NÃO HÁ LISTA SEMÁFORO =========\n");
-			
-	}
-	printf("========== DEBUG SEMAPHORE LIST ==========\n");
-	return 0;
+int debug_blocked_semaphor() {
+    int i = 1;
+    int t;
+    //função que imprime a lista de semaforos em detalhes.
+    printf("========== DEBUG SEMAPHORE LIST ==========\n");
+    if (FirstFila2(blocked_semaphor) == 0) {
+        do {
+            printf("==                                      ==\n");
+            csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
+            if (value != NULL) {
+                t = 0;
+                do {
+                    TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
+                    if (value2 != NULL) {
+                        t++;
+                    }
+                }
+                while (NextFila2(value->fila) == 0);
+                printf("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t);
+                i++;
+            }
+        }
+        while (NextFila2(blocked_semaphor) == 0);
+
+
+    }
+    else {
+        printf("========== NÃO HÁ LISTA SEMÁFORO =========\n");
+
+    }
+    printf("========== DEBUG SEMAPHORE LIST ==========\n");
+    return 0;
 }
 
 
-
-
-
-
-
+/*
+ * Gera uma nova tid
+ */
 //------------------------------------------------------------------------------
 // Gera uma nova tid
 //------------------------------------------------------------------------------
@@ -302,9 +316,6 @@ int current_tid = 0;
 int generate_tid() {
     return ++current_tid;
 }
-
-
-
 
 //------------------------------------------------------------------------------
 // Destrói a thread.
@@ -319,20 +330,22 @@ TCB_t *cdestroy(TCB_t *thread) {
 //==============================================================================
 // Filas de Aptos
 //==============================================================================
-int push_ready(TCB_t *thread)
-{
-    PFILA2 queue = ready[thread->prio];
+
+/*
+ * Apende nova thread nas filas de aptos
+ */
+int ready_push(TCB_t *thread) {
+    FILA2 *queue = ready[thread->prio];
     return AppendFila2(queue, (void *) thread);
 }
 
-//------------------------------------------------------------------------------
-// Retorna o primeiro elemento de menor prioridade das filas de aptos e remove
-// esse elemento das filas.
-//
-// Caso não haja mais nenhum elemento nas filas, retorna NULL.
-//------------------------------------------------------------------------------
-TCB_t *shift_ready()
-{
+/*
+ * Retorna o primeiro elemento de menor prioridade das filas de aptos e remove
+ * esse elemento das filas.
+ *
+ * Caso não haja mais nenhum elemento nas filas, retorna NULL.
+ */
+TCB_t *ready_shift() {
     TCB_t *th = NULL;
     int i;
     for (i = 0; i < 4; ++i) {
@@ -345,29 +358,45 @@ TCB_t *shift_ready()
     return th;
 }
 
-//------------------------------------------------------------------------------
-// Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
-// elemento.
-// 
-// Caso ele não seja encontrado, nada acontece e NULL é retornado.
-//------------------------------------------------------------------------------
-TCB_t *remove_ready(int tid)
-{
-    TCB_t *th = NULL;
+/*
+ * Retorna um resultado de busca nas filas de aptos.  Caso seja encontrada a
+ * thread com o tid correspondente, é retornada uma estrutura contendo o
+ * iterador da fila em que a thread se encontra, bem como o número da fila.
+ *
+ * Caso nenhuma thread com o tid fornecido seja encontrada, a função retorna
+ * NULL
+ */
+FindResult *ready_find(int tid) {
+    FindResult *result = NULL;
     int i;
-    for (i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; ++i) {
         FirstFila2(ready[i]);
         do {
-            th = GetAtIteratorFila2(ready[i]);
-            if (th->tid == tid) {
-                DeleteAtIteratorFila2(ready[i]);
-                return th;
+            if (((TCB_t *)GetAtIteratorFila2(ready[i]))->tid == tid) {
+                result->node = ready[i]->it;
+                result->queue_number = i;
             }
-        } while (NextFila2(ready[i]));
+        }
+        while (NextFila2(ready[i]));
     }
-    return th;
+    return result;
 }
 
+
+/*
+ * Remove o elemento com a "tid" fornecida das filas de aptos e retorna esse
+ * elemento.
+ *
+ * Caso ele não seja encontrado, nada acontece e NULL é retornado.
+ */
+TCB_t *ready_remove(int tid) {
+    FindResult *result = ready_find(tid);
+    if (result != NULL) {
+        DeleteAtIteratorFila2(ready[result->queue_number]);
+        return (TCB_t *)(result->node->node);
+    }
+    return NULL;
+}
 //==============================================================================
 // Funções da biblioteca cthread
 //==============================================================================
@@ -378,49 +407,66 @@ TCB_t *remove_ready(int tid)
  * =============================================================================
  *
  * UCONTEXT(3)    BSD Library Functions Manual        UCONTEXT(3)
- * 
+ *
  * NAME
  *     ucontext -- user thread context
- * 
+ *
  * LIBRARY
  *     Standard C Library (libc, -lc)
- * 
+ *
  * SYNOPSIS
  *     #include <ucontext.h>
- * 
+ *
  * DESCRIPTION
- * 
+ *
  *     The ucontext_t type is a structure type suitable for holding the
  *     context for a user thread of execution.  A thread's context includes its stack,
  *     saved registers, and list of blocked signals.
- * 
+ *
  *     The ucontext_t structure contains at least these fields:
- * 
+ *
  *     ucontext_t *uc_link      context to assume when this one returns
  *     sigset_t uc_sigmask      signals being blocked
  *     stack_t uc_stack         stack area
  *     mcontext_t uc_mcontext   saved registers
- * 
+ *
  *     The uc_link field points to the context to resume when this context's entry
  *     point function returns.  If uc_link is equal to NULL, then the process exits
  *     when this context returns.
- * 
+ *
  *     The uc_mcontext field is machine-dependent and should be treated as opaque by
  *     portable applications.
- * 
+ *
  *     The following functions are defined to manipulate ucontext_t structures:
- * 
+ *
  *     int getcontext(ucontext_t *);
  *     int setcontext(const ucontext_t *);
  *     void makecontext(ucontext_t *, void (*)(void), int, ...);
  *     int swapcontext(ucontext_t *, const ucontext_t *);
- * 
+ *
  * SEE ALSO
  *     sigaltstack(2), getcontext(3), makecontext(3)
- * 
+ *
  * BSD             September 10, 2002                BSD
+ *
  */
 
+/*
+ * Cria uma nova thread.
+ *
+ * Parâmetros:
+ *  start: ponteiro para a função que a thread executará.
+ *
+ *  arg: um parâmetro que pode ser passado para a thread na sua criação.
+ *  (Obs.: é um único parâmetro. Se for necessário passar mais de um valor
+ *  deve-se empregar um ponteiro para uma struct)
+ *
+ *  prio: prioridade com que deve ser criada a thread.
+ *
+ * Retorno:
+ *  Quando executada corretamente: retorna um valor positivo, que representa o
+ *  identificador da thread criada, caso contrário, retorna um valor negativo.
+ */
 //------------------------------------------------------------------------------
 // Cria uma nova thread.
 //
@@ -437,13 +483,13 @@ TCB_t *remove_ready(int tid)
 //  Quando executada corretamente: retorna um valor positivo, que representa o
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
-
 int ccreate(void* (*start)(void*), void *arg, int priority) {
 	init();
+    /*byte *context_stack = malloc(STACK_SIZE);*/
 	
 	int new_tid = generate_tid();
 	
-	TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
+	TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
 	thread->tid = new_tid;
 	thread->prio = priority;
 	thread->state = PROCST_CRIACAO;
@@ -503,8 +549,9 @@ int csem_init(csem_t *sem, int count) {
 	if(insert_semaphore_on_blocked_semaphor(sem)==0){
 		return CreateFila2(sem->fila);
 	}
-	else
+	else {
 		return ERROR_CODE;
+    }
 }
 
 /*
@@ -535,14 +582,13 @@ int cwait(csem_t *sem) {
 }
 
 /*
-	Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
-*/
+ * Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
+ */
 int csignal(csem_t *sem) {
 	init();
 	if ((sem == NULL) || (sem->fila == NULL)) {
 		//Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
 		return ERROR_CODE;
-	
 	}
 
 	sem->count += 1;
@@ -557,19 +603,20 @@ int csignal(csem_t *sem) {
 	}
 }
 
-//------------------------------------------------------------------------------
-// Copia o nome e número do cartão dos alunos para um endereço fornecido
-//
-// Params:
-//  char *name :: Endereço aonde serão copiados os nomes dos alunos
-//  int size :: Limite de caracteres que serão copiados para o endereço
-//------------------------------------------------------------------------------
-int cidentify(char *name, int size)
-{
-    char *names = "Carlos Pinheiro -- 109910\nBruno Feil      -- 216631\nHugo Constantinopolos -- 208897";
-	
+/*
+ * Copia o nome e número do cartão dos alunos para um endereço fornecido
+ *
+ * Params:
+ *  char *name :: Endereço aonde serão copiados os nomes dos alunos
+ *  int size :: Limite de caracteres que serão copiados para o endereço
+ */
+int cidentify(char *name, int size) {
+    // TODO: Incluir os dados do último integrante.
+    char *names =
+        "Carlos Pinheiro -- 109910\n"
+        "Bruno Feil      -- 216631\n"
+        "Hugo Constantinopolos -- 208897";
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
 }
-
 
