@@ -74,14 +74,14 @@ TCB_t *running_thread = NULL;    // Executando
 //------------------------------------------------------------------------------
 
 int init_main_thread() {
-	//TODO: implementar a inicializacao da thread main.
-	
-	return SUCCESS_CODE;
+    //TODO: implementar a inicializacao da thread main.
+
+    return SUCCESS_CODE;
 }
 
 int init_end_context() {
-	//TODO: implementar a inicializacao do contexto de finalizacao de thread.
-	return SUCCESS_CODE;
+    //TODO: implementar a inicializacao do contexto de finalizacao de thread.
+    return SUCCESS_CODE;
 }
 
 //------------------------------------------------------------------------------
@@ -89,150 +89,163 @@ int init_end_context() {
 // funções dependem.  Deve ser chamada nas outras funções, por garantia.
 //------------------------------------------------------------------------------
 int init() {
-	if (!initialized_globals) {
+    if (!initialized_globals) {
 
-		initialized_globals = true;
+        initialized_globals = true;
 
-		// inicializar a thread main e colocar em executando.
-		if(init_main_thread() != SUCCESS_CODE)
-			return ERROR_CODE;
+        // inicializar a thread main e colocar em executando.
+        if (init_main_thread() != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
 
-		// inicializar o contexto de finalizacao de thread.
-		if(init_end_context() != SUCCESS_CODE)
-			return ERROR_CODE;
+        // inicializar o contexto de finalizacao de thread.
+        if (init_end_context() != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
 
-		// O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
-		// partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
+        // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
+        // partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
 
-		// Inicializa as diversas filas de threads
-		size_t queue_size = sizeof(struct sFila2);
-		int i;
-		for (i = 0; i < 4; ++i) {
-		ready[i] = malloc(queue_size);
-		CreateFila2(ready[i]);
-		}
-		blocked_join = (FILA2 *)malloc(sizeof(FILA2));
-	
-		if(CreateFila2(blocked_join)!=SUCCESS_CODE)
-			return ERROR_CODE;
+        // Inicializa as diversas filas de threads
+        size_t queue_size = sizeof(struct sFila2);
+        int i;
+        for (i = 0; i < 4; ++i) {
+            ready[i] = malloc(queue_size);
+            CreateFila2(ready[i]);
+        }
+        blocked_join = (FILA2 *)malloc(sizeof(FILA2));
 
-		blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
-		if(CreateFila2(blocked_semaphor)!=SUCCESS_CODE)
-			return ERROR_CODE;
+        if (CreateFila2(blocked_join) != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
 
-		return SUCCESS_CODE;
-	}
-	return SUCCESS_CODE;
+        blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
+        if (CreateFila2(blocked_semaphor) != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
+
+        return SUCCESS_CODE;
+    }
+    return SUCCESS_CODE;
 }
 
 //------------------------------------------------------------------------------
 //Funcoes da lista de bloqueados cjoin
 //------------------------------------------------------------------------------
-int blocked_join_insert(DUPLA_t *thread){//essa estrutura Duplacjoin está definida em queue.h
-	//funcao que insere uma dupla thread,tid esperado na lista de bloq. cjoin.
-	//provavelmente a funcao seja so isso.
-	return AppendFila2(blocked_join, thread);
+int blocked_join_insert(DUPLA_t *thread) { //essa estrutura Duplacjoin está definida em queue.h
+    //funcao que insere uma dupla thread,tid esperado na lista de bloq. cjoin.
+    //provavelmente a funcao seja so isso.
+    return AppendFila2(blocked_join, thread);
 }
 
 int blocked_join_remove(DUPLA_t *toremove) { //essa estrutura Duplacjoin está definida em queue.h
-	//funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
-	//bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
-	if (FirstFila2(blocked_join) == 0) {
-		do {
-			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
-			if (value != NULL)
-				if (value == toremove) {
-					return  DeleteAtIteratorFila2(blocked_join);
-				}
-		} while (NextFila2(blocked_join) == 0);
-		
-		return ERROR_CODE;
+    //funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
+    //bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
+    if (FirstFila2(blocked_join) == 0) {
+        do {
+            DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+            if (value != NULL)
+                if (value == toremove) {
+                    return  DeleteAtIteratorFila2(blocked_join);
+                }
+        }
+        while (NextFila2(blocked_join) == 0);
+
+        return ERROR_CODE;
 
 
-	} // Fila vazia, não É POSSÍVEL REMOVER.
-	else {
-		return ERROR_CODE;
-	}
+    } // Fila vazia, não É POSSÍVEL REMOVER.
+    else {
+        return ERROR_CODE;
+    }
 }
 
-TCB_t* blocked_join_get_thread(int tid) {
-	//funcao que verifica a existencia de uma thread na fila de bloqueados por cjoin.
-	//retorna um ponteiro para a thread caso a encontre, e um ponteiro NULL caso a thread nao seja encontrada.
-	if (FirstFila2(blocked_join) == 0) {
-		do {
-			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
-			if (value != NULL)
-				if (value->blockedThread->tid == tid) {
-				return  value->blockedThread;
-			}
-		} while (NextFila2(blocked_join) == 0);
-		return NULL;
+TCB_t *blocked_join_get_thread(int tid) {
+    //funcao que verifica a existencia de uma thread na fila de bloqueados por cjoin.
+    //retorna um ponteiro para a thread caso a encontre, e um ponteiro NULL caso a thread nao seja encontrada.
+    if (FirstFila2(blocked_join) == 0) {
+        do {
+            DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+            if (value != NULL)
+                if (value->blockedThread->tid == tid) {
+                    return  value->blockedThread;
+                }
+        }
+        while (NextFila2(blocked_join) == 0);
+        return NULL;
 
 
-	} // Fila vazia, não existe.
-	else {
-		return NULL;
-	}
+    } // Fila vazia, não existe.
+    else {
+        return NULL;
+    }
 }
 
-DUPLA_t* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacjoin está definida em queue.h
-	//funcao que procura por um tid esperado na lista de duplas da fila cjoin,
-	//pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
-	//retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
+DUPLA_t *blocked_join_get_thread_waiting_for(int
+        tid) { //essa estrutura Duplacjoin está definida em queue.h
+    //funcao que procura por um tid esperado na lista de duplas da fila cjoin,
+    //pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
+    //retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
 
-	if (FirstFila2(blocked_join) == 0) {
-		do {
-			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
-			if (value != NULL)
-				if (value->waitedTid == tid) {
-					return  value;
-				}
-		} while (NextFila2(blocked_join) == 0);
-		return NULL;
+    if (FirstFila2(blocked_join) == 0) {
+        do {
+            DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+            if (value != NULL)
+                if (value->waitedTid == tid) {
+                    return  value;
+                }
+        }
+        while (NextFila2(blocked_join) == 0);
+        return NULL;
 
 
-	} // Fila vazia, não existe.
-	else {
-		return NULL;
-	}
+    } // Fila vazia, não existe.
+    else {
+        return NULL;
+    }
 }
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
 
-int insert_semaphore_on_blocked_semaphor(csem_t *sem){
-    	//funcao que insere um semaforo na lista de semaforos criados.
-	//retorna 0 quando a insercao e bem sucedida e -1 quando ha erros.
-	
-	if (FirstFila2(blocked_semaphor) == 0) {
-		do {	
-		csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
-		if (value != NULL && value == sem) {
-			//semaforo ja esta na fila, portanto nao ha insercao e retorna codigo de sucesso.
-			return SUCCESS_CODE;
-			}
-		} while (NextFila2(blocked_semaphor) == 0);
-		//caso o semaforo nao esteja inserido, ele eh entao inserido na fila.
-		return AppendFila2(blocked_semaphor, sem);
-		
-		
-	} else {
-		//caso seja o primeiro elemento, o semaforo sem eh simplesmente inserido.
-		return AppendFila2(blocked_semaphor, sem);
-	}
+int insert_semaphore_on_blocked_semaphor(csem_t *sem) {
+    //funcao que insere um semaforo na lista de semaforos criados.
+    //retorna 0 quando a insercao e bem sucedida e -1 quando ha erros.
+
+    if (FirstFila2(blocked_semaphor) == 0) {
+        do {
+            csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
+            if (value != NULL && value == sem) {
+                //semaforo ja esta na fila, portanto nao ha insercao e retorna codigo de sucesso.
+                return SUCCESS_CODE;
+            }
+        }
+        while (NextFila2(blocked_semaphor) == 0);
+        //caso o semaforo nao esteja inserido, ele eh entao inserido na fila.
+        return AppendFila2(blocked_semaphor, sem);
+
+
+    }
+    else {
+        //caso seja o primeiro elemento, o semaforo sem eh simplesmente inserido.
+        return AppendFila2(blocked_semaphor, sem);
+    }
 }
 
-TCB_t* get_first_of_semaphore_queue(csem_t *sem) {
-    	//funcao que remove e retorna o primeiro elemento da fila de um semaforo
-	//retorna um ponteiro para a thread se a funcao for bem sucedida
-	//e um ponteiro NULL em caso de thread nao existente.
-	
-	if (FirstFila2(sem->fila) == 0) {
-		TCB_t *value = (TCB_t *)GetAtIteratorFila2(sem->fila);
-		DeleteAtIteratorFila2(sem->fila);
-		return value;
-		
-	}else return NULL;	
+TCB_t *get_first_of_semaphore_queue(csem_t *sem) {
+    //funcao que remove e retorna o primeiro elemento da fila de um semaforo
+    //retorna um ponteiro para a thread se a funcao for bem sucedida
+    //e um ponteiro NULL em caso de thread nao existente.
+
+    if (FirstFila2(sem->fila) == 0) {
+        TCB_t *value = (TCB_t *)GetAtIteratorFila2(sem->fila);
+        DeleteAtIteratorFila2(sem->fila);
+        return value;
+
+    }
+    else {
+        return NULL;
+    }
 }
 
 TCB_t *get_thread_from_blocked_semaphor(int tid) {
@@ -483,124 +496,126 @@ TCB_t *ready_remove(int tid) {
 //  Quando executada corretamente: retorna um valor positivo, que representa o
 //  identificador da thread criada, caso contrário, retorna um valor negativo.
 //------------------------------------------------------------------------------
-int ccreate(void* (*start)(void*), void *arg, int priority) {
-	init();
+int ccreate(void *(*start)(void *), void *arg, int priority) {
+    init();
     /*byte *context_stack = malloc(STACK_SIZE);*/
-	
-	int new_tid = generate_tid();
-	
-	TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
-	thread->tid = new_tid;
-	thread->prio = priority;
-	thread->state = PROCST_CRIACAO;
-	
-	getcontext(&(thread->context));
-	
-	//TODO:Descobrir o que fazer com o resto do contexto.
-	// th->context.uc_link  ->> contexto de finalização
-    	// th->context.uc_sigmask ->> man: uc_sigmask is the set of signals blocked in this context, acho que nao precisa setar nada.
-    	// th->context.uc_stack;  ->> pilha usada pelo contexto, precisa um set em uc_stack.ss_size
-    	// th->context.uc_mcontext ->> man: uc_mcontext is the machine-specific representation of the saved
-       	// context, that includes the calling thread's machine registers. Acho que a propria funcao de getcontext ja faz o set.
 
-	makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
-	
-	ready_push(thread);
+    int new_tid = generate_tid();
 
-	return new_tid;
+    TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
+    thread->tid = new_tid;
+    thread->prio = priority;
+    thread->state = PROCST_CRIACAO;
+
+    getcontext(&(thread->context));
+
+    //TODO:Descobrir o que fazer com o resto do contexto.
+    // th->context.uc_link  ->> contexto de finalização
+    // th->context.uc_sigmask ->> man: uc_sigmask is the set of signals blocked in this context, acho que nao precisa setar nada.
+    // th->context.uc_stack;  ->> pilha usada pelo contexto, precisa um set em uc_stack.ss_size
+    // th->context.uc_mcontext ->> man: uc_mcontext is the machine-specific representation of the saved
+    // context, that includes the calling thread's machine registers. Acho que a propria funcao de getcontext ja faz o set.
+
+    makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
+
+    ready_push(thread);
+
+    return new_tid;
 }
 
-int csetprio(int tid, int prio){
-	init();
-	return SUCCESS_CODE;
+int csetprio(int tid, int prio) {
+    init();
+    return SUCCESS_CODE;
 }
 
-int cyield(){
-	init();
-	return SUCCESS_CODE;
+int cyield() {
+    init();
+    return SUCCESS_CODE;
 }
 
-int cjoin(int tid){
-	init();
-	return SUCCESS_CODE;
+int cjoin(int tid) {
+    init();
+    return SUCCESS_CODE;
 }
 
 //------------------------------------------------------------------------------
 // Inicializa um semáforo
 //------------------------------------------------------------------------------
 int csem_init(csem_t *sem, int count) {
-	init();
-	if (sem == NULL) {
-		//printf("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n");
-		return CSEM_INIT_ERROR;
-	}
-	if (sem->fila != NULL){
-		//printf("Nao e possivel inicializar um semaforo ja inicializado.\n");
-		return CSEM_INIT_ERROR;
-	}
-	//printf("Inicializando a contagem do semáforo\n");
-	sem->count = count;
+    init();
+    if (sem == NULL) {
+        //printf("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n");
+        return CSEM_INIT_ERROR;
+    }
+    if (sem->fila != NULL) {
+        //printf("Nao e possivel inicializar um semaforo ja inicializado.\n");
+        return CSEM_INIT_ERROR;
+    }
+    //printf("Inicializando a contagem do semáforo\n");
+    sem->count = count;
 
-	//printf("Inicializando a fila referente ao semáforo.\n");
-	sem->fila = (FILA2 *)malloc(sizeof(FILA2));
-	
-	//insere o semáforo na lista de semáforos
-	//printf("inserindo semaforo na fila de semaforos.\n");
-	if(insert_semaphore_on_blocked_semaphor(sem)==0){
-		return CreateFila2(sem->fila);
-	}
-	else {
-		return ERROR_CODE;
+    //printf("Inicializando a fila referente ao semáforo.\n");
+    sem->fila = (FILA2 *)malloc(sizeof(FILA2));
+
+    //insere o semáforo na lista de semáforos
+    //printf("inserindo semaforo na fila de semaforos.\n");
+    if (insert_semaphore_on_blocked_semaphor(sem) == 0) {
+        return CreateFila2(sem->fila);
+    }
+    else {
+        return ERROR_CODE;
     }
 }
 
 /*
-	Tranca o semaforo se o mesmo ainda nao esta trancado, se ja estiver trancado
-	coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
+    Tranca o semaforo se o mesmo ainda nao esta trancado, se ja estiver trancado
+    coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
 */
 int cwait(csem_t *sem) {
-	init();
-	
-	if ((sem == NULL) || (sem->fila == NULL)) {
-		// Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
-		return ERROR_CODE;
-	}
-	
-	if (sem->count > 0) {
-		// O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
-		sem->count -= 1;
-		return SUCCESS_CODE;
-	} else {
-		// O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
-		sem->count -= 1;
-        	//altera o estado da thread ativa para bloqueado.
-		//insere na fila de bloqueados do semaforo a thread ativa.
+    init();
 
-    		//executa o escalonador.
-	}
-	return SUCCESS_CODE;
+    if ((sem == NULL) || (sem->fila == NULL)) {
+        // Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+        return ERROR_CODE;
+    }
+
+    if (sem->count > 0) {
+        // O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
+        sem->count -= 1;
+        return SUCCESS_CODE;
+    }
+    else {
+        // O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
+        sem->count -= 1;
+        //altera o estado da thread ativa para bloqueado.
+        //insere na fila de bloqueados do semaforo a thread ativa.
+
+        //executa o escalonador.
+    }
+    return SUCCESS_CODE;
 }
 
 /*
  * Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
  */
 int csignal(csem_t *sem) {
-	init();
-	if ((sem == NULL) || (sem->fila == NULL)) {
-		//Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
-		return ERROR_CODE;
-	}
+    init();
+    if ((sem == NULL) || (sem->fila == NULL)) {
+        //Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+        return ERROR_CODE;
+    }
 
-	sem->count += 1;
-	TCB_t *thread = (TCB_t *)get_first_of_semaphore_queue(sem);	
-	if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
-		//estado da thread e modificado para APTO
-		thread->state = PROCST_APTO;
-		return ready_push(thread);
-	} else {
-		//O semaforo esta livre. Segue execucao.
-		return SUCCESS_CODE;
-	}
+    sem->count += 1;
+    TCB_t *thread = (TCB_t *)get_first_of_semaphore_queue(sem);
+    if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
+        //estado da thread e modificado para APTO
+        thread->state = PROCST_APTO;
+        return ready_push(thread);
+    }
+    else {
+        //O semaforo esta livre. Segue execucao.
+        return SUCCESS_CODE;
+    }
 }
 
 /*
@@ -611,10 +626,9 @@ int csignal(csem_t *sem) {
  *  int size :: Limite de caracteres que serão copiados para o endereço
  */
 int cidentify(char *name, int size) {
-    // TODO: Incluir os dados do último integrante.
     char *names =
-        "Carlos Pinheiro -- 109910\n"
-        "Bruno Feil      -- 216631\n"
+        "Carlos Pinheiro       -- 109910\n"
+        "Bruno Feil            -- 216631\n"
         "Hugo Constantinopolos -- 208897";
 
     return strncpy(name, names, size) == 0 ? CIDENTIFY_SUCCESS : CIDENTIFY_ERROR;
