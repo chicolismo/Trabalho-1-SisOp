@@ -19,14 +19,11 @@
 // Tipos
 //=============================================================================
 typedef char byte;
-//typedef enum State { NEW, READY, RUNNING, BLOCKED, TERMINATED } State;  << Já está definido nos arquivos do professor.
 
 
 //=============================================================================
 // Constantes
 //=============================================================================
-
-#define STACK_SIZE (sizeof(byte) * SIGSTKSZ)
 
 // Faz "cast" um arg para um ponteiro de função void sem argumentos
 #define VOID_FUNCTION(arg) (void (*)(void)) (arg)
@@ -47,6 +44,10 @@ typedef char byte;
 #define SUCCESS_CODE 0
 #define ERROR_CODE -1
 
+// init_ending_ctx
+#define INIT_ENDING_CTX_ERROR -1
+#define INIT_ENDING_CTX_SUCCESS 0
+
 
 //==============================================================================
 // Globais
@@ -59,6 +60,27 @@ FILA2 *ready[4];          // Quatro filas de aptos
 FILA2 *blocked_join;      // Bloqueados esperando outra thread terminar
 FILA2 *blocked_semaphor;  // Bloqueados esperando semáforo
 TCB_t *running_thread = NULL;    // Executando
+ucontext_t *ending_ctx = NULL;
+
+void end_thread() {
+}
+
+int init_ending_ctx() { 
+    ending_ctx = malloc(sizeof(ucontext_t));
+
+    if ((getcontext(ending_ctx) != 0) || ending_ctx == NULL) {
+        // Deu merda
+        return INIT_ENDING_CTX_ERROR;
+    }
+
+    ending_ctx->uc_stack.ss_sp = malloc(SIGSTKSZ);
+    ending_ctx->uc_stack.ss_size = SIGSTKSZ;
+    ending_ctx->uc_link = NULL; // Nada a fazer quando acabar
+
+    makecontext(ending_ctx, end_thread, 0);
+
+    return INIT_ENDING_CTX_SUCCESS;
+}
 
 //==============================================================================
 // Funções
@@ -498,24 +520,29 @@ TCB_t *ready_remove(int tid) {
 //------------------------------------------------------------------------------
 int ccreate(void *(*start)(void *), void *arg, int priority) {
     init();
-    /*byte *context_stack = malloc(STACK_SIZE);*/
 
     int new_tid = generate_tid();
 
     TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
+
     thread->tid = new_tid;
     thread->prio = priority;
     thread->state = PROCST_CRIACAO;
 
     getcontext(&(thread->context));
 
-    //TODO:Descobrir o que fazer com o resto do contexto.
+    if ((thread->context.uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
+        return CCREATE_ERROR;
+    }
+
+    // NOTE: Descobrir o que fazer com o resto do contexto.
     // th->context.uc_link  ->> contexto de finalização
     // th->context.uc_sigmask ->> man: uc_sigmask is the set of signals blocked in this context, acho que nao precisa setar nada.
     // th->context.uc_stack;  ->> pilha usada pelo contexto, precisa um set em uc_stack.ss_size
     // th->context.uc_mcontext ->> man: uc_mcontext is the machine-specific representation of the saved
     // context, that includes the calling thread's machine registers. Acho que a propria funcao de getcontext ja faz o set.
-
+    thread->context.uc_stack.ss_size = SIGSTKSZ;
+    thread->context.uc_link = ending_ctx;
     makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
 
     ready_push(thread);
