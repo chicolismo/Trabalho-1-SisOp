@@ -139,7 +139,7 @@ int blocked_join_remove(DUPLA_t *toremove) { //essa estrutura Duplacjoin está d
 			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
 			if (value != NULL)
 				if (value == toremove) {
-					return  DeleteAtIteratorFila2(value);
+					return  DeleteAtIteratorFila2(blocked_join);
 				}
 		} while (NextFila2(blocked_join) == 0);
 		
