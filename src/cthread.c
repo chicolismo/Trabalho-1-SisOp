@@ -192,6 +192,7 @@ DUPLA_t* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacj
 	else {
 		return NULL;
 	}
+}
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
