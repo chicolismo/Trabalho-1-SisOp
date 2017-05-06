@@ -131,24 +131,67 @@ int blocked_join_insert(DUPLA_t *thread){//essa estrutura Duplacjoin está defin
 	return AppendFila2(blocked_join, thread);
 }
 
-int blocked_join_remove(DUPLA_t *thread) { //essa estrutura Duplacjoin está definida em queue.h
+int blocked_join_remove(DUPLA_t *toremove) { //essa estrutura Duplacjoin está definida em queue.h
 	//funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
 	//bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
-	return 0;
+	if (FirstFila2(blocked_join) == 0) {
+		do {
+			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+			if (value != NULL)
+				if (value == toremove) {
+					return  DeleteAtIteratorFila2(value);
+				}
+		} while (NextFila2(blocked_join) == 0);
+		
+		return ERROR_CODE;
+
+
+	} // Fila vazia, não É POSSÍVEL REMOVER.
+	else {
+		return ERROR_CODE;
+	}
 }
 
 TCB_t* blocked_join_get_thread(int tid) {
 	//funcao que verifica a existencia de uma thread na fila de bloqueados por cjoin.
 	//retorna um ponteiro para a thread caso a encontre, e um ponteiro NULL caso a thread nao seja encontrada.
-	return NULL;
+	if (FirstFila2(blocked_join) == 0) {
+		do {
+			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+			if (value != NULL)
+				if (value->blockedThread->tid == tid) {
+				return  value->blockedThread;
+			}
+		} while (NextFila2(blocked_join) == 0);
+		return NULL;
+
+
+	} // Fila vazia, não existe.
+	else {
+		return NULL;
+	}
 }
 
 DUPLA_t* blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacjoin está definida em queue.h
 	//funcao que procura por um tid esperado na lista de duplas da fila cjoin,
 	//pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
 	//retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
-	return NULL;
-}
+
+	if (FirstFila2(blocked_join) == 0) {
+		do {
+			DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+			if (value != NULL)
+				if (value->waitedTid == tid) {
+					return  value;
+				}
+		} while (NextFila2(blocked_join) == 0);
+		return NULL;
+
+
+	} // Fila vazia, não existe.
+	else {
+		return NULL;
+	}
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
