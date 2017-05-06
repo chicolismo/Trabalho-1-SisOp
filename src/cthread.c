@@ -505,7 +505,7 @@ int ccreate(void* (*start)(void*), void *arg, int priority) {
 
 	makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
 	
-	push_ready(thread);
+	ready_push(thread);
 
 	return new_tid;
 }
@@ -596,7 +596,7 @@ int csignal(csem_t *sem) {
 	if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
 		//estado da thread e modificado para APTO
 		thread->state = PROCST_APTO;
-		return push_ready(thread);
+		return ready_push(thread);
 	} else {
 		//O semaforo esta livre. Segue execucao.
 		return SUCCESS_CODE;
