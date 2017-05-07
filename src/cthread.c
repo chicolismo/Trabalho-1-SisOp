@@ -586,9 +586,9 @@ int csetprio(int tid, int prio) {
         return ERROR_CODE;
     }
     TCB_t *thread = NULL;
-    if ((thread = blocked_join_get_thread(tid)) != NULL) {
-        if ((thread = get_thread_from_blocked_semaphor(tid)) != NULL) {
-            if (ready_get_thread(tid) != NULL) {
+    if ((thread = blocked_join_get_thread(tid)) == NULL) {
+        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
+            if ((thread = ready_get_thread(tid)) == NULL) {
                 //Thread a ser modificada não existe.
                 return ERROR_CODE;
             }
@@ -597,7 +597,7 @@ int csetprio(int tid, int prio) {
             }
         }
     }
-    //thread existe
+    // A thread existe
 
     if (thread_in_ready) {
         //TODO: remoção da fila de aptos, troca de prioridade e reinserçao na fila de aptos.
