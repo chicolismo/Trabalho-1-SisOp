@@ -1,15 +1,15 @@
 /*
- * cdata.h: arquivo de inclus„o de uso apenas na geraÁ„o da libpithread
+ * cdata.h: arquivo de inclus√£o de uso apenas na gera√ß√£o da libpithread
  *
  * Esse arquivo pode ser modificado. ENTRETANTO, deve ser utilizada a TCB fornecida
  *
- * Vers„o de 25/04/2017
+ * Vers√£o de 25/04/2017
  *
  */
 #ifndef __cdata__
 #define __cdata__
 
-// Necess·rio para usar "ucontext.h"
+// Necess√°rio para usar "ucontext.h"
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 500
 #endif
@@ -21,29 +21,39 @@
 #define PROCST_EXEC 2
 #define PROCST_BLOQ 3
 #define PROCST_TERMINO  4
+//AVISO DO CECHIN NO DIA 9/5
+/*
+Pessoal,
 
+Conforme avisei em aula, seguem as informa√ß√µes de orienta√ß√£o sobre o trabalho:
+
+O arquivo CTHREAD.H n√£o dever√° ser alterado. Mantenham o mesmo arquivo distribu√≠do e utilizem o campo TICKET como a PRIORIDADE atribu√≠da √† thread
+Os exemplo devem ser alterados para que a "ccreate" tenha um terceiro par√¢metro com a prioridade. Sugere-se que seja prioridade "0" (zero)
+A thread MAIN dever√° ter prioridade "0" (zero)
+S√©rgio Cechin
+*/
 //==============================================================================
 // Thread Control Block
 //==============================================================================
 
-/* N√O ALTERAR ESSA struct */
+/* N√ÉO ALTERAR ESSA struct */
 typedef struct s_TCB {
     // Identificador da thread.
     int tid;
 
     // Estado em que a thread se encontra.
-    //   0: CriaÁ„o; 1: Apto; 2: ExecuÁ„o; 3: Bloqueado e 4: TÈrmino
+    //   0: Cria√ß√£o; 1: Apto; 2: Execu√ß√£o; 3: Bloqueado e 4: T√©rmino
     int state;
 
     //***********************************************************************************
-    // NOTE: A struct original se referia a um trabalho antigo, e n„o possuia
+    // NOTE: A struct original se referia a um trabalho antigo, e n√£o possuia
     // prioridade.
     //***********************************************************************************
 
     // Prioridade da thread, para uso do escalonador
     int prio;
 
-    // contexto de execuÁ„o da thread (SP, PC, GPRs e recursos)
+    // contexto de execu√ß√£o da thread (SP, PC, GPRs e recursos)
     ucontext_t  context;
 } TCB_t;
 
