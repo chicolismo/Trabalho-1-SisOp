@@ -62,7 +62,6 @@ FILA2 *ready[4];          // Quatro filas de aptos
 FILA2 *blocked_join;      // Bloqueados esperando outra thread terminar
 FILA2 *blocked_semaphor;  // Bloqueados esperando semáforo
 TCB_t *running_thread = NULL;    // Executando
-DUPLA_t *waiting_thread = NULL;   //Dupla do tid finalizado e da thread bloqueada.
 ucontext_t *ending_ctx = NULL;
 
 
@@ -132,15 +131,15 @@ int main(void)
 
 int dispatch() {
 		
-	bool swapped_context = false;
+	int swapped_context = 0;
 
 	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.	
 		getcontext(&(running_thread->context));
 	}
     
-	if (swapped_context == false) {
+	if (swapped_context == 0) {
         // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
-		swapped_context = true;
+		swapped_context = 1;
 		running_thread = ready_shift();
 
 		if (current_running_thread == NULL || current_running_thread->tid < 0) {
@@ -230,11 +229,6 @@ int init_main_thread() {
     //Não é necessário usar um makecontext, pois o contexto da thread é a propria main, que está em execução.
 	
 	return SUCCESS_CODE;
-}
-
-int init_end_context() {
-    //TODO: implementar a inicializacao do contexto de finalizacao de thread.
-    return SUCCESS_CODE;
 }
 
 //------------------------------------------------------------------------------
@@ -355,6 +349,30 @@ DUPLA_t *blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacj
     else {
         return NULL;
     }
+}
+
+void debug_print_blocked_list()
+{
+	DUPLA_t *print;	
+	if (FirstFila2(blocked_join) == 0) {
+		printf("##################################################\n");
+		printf("############### FILA DE BLOQUEADOS ###############\n");
+		printf("##################################################\n");
+		do
+		{
+			print = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+			if(print == NULL) break;
+			if(print->blockedThread != NULL){
+				printf("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid, print->waitedTid);
+			}
+			else {
+				printf("# tid bloqueado: atual  / esperando pelo tid: %d # \n",print->waitedTid);
+			}
+		} while (NextFila2(blocked_join) == 0);
+		printf("##################################################\n");
+		return;
+	}
+	return;
 }
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
@@ -561,8 +579,10 @@ TCB_t *ready_get_thread(int tid) {
         FirstFila2(ready[i]);
         do {
             thread = (TCB_t *)GetAtIteratorFila2(ready[i]);
-            if (thread->tid == tid) {
-                return thread;
+	    if(thread != NULL){	
+            	if (thread->tid == tid) {
+                    return thread;
+		}
             }
         }
         while (NextFila2(ready[i]));
@@ -723,10 +743,15 @@ int csetprio(int tid, int prio) {
             }
         }
     }
-    // A thread existe
+    // A thread existe e est[a apontada pelo ponteiro thread.
 
     if (thread_in_ready) {
         //TODO: remoção da fila de aptos, troca de prioridade e reinserçao na fila de aptos.
+	thread = ready_remove(thread->tid);
+	if(thread != NULL){
+		thread->prio = prio;
+		ready_push(thread);
+	}
     }
     else {
         thread->prio = prio;
@@ -738,12 +763,34 @@ int cyield() {
     init();
 
     running_thread->state = PROCST_APTO;
+    ready_push(running_thread);
     return dispatch();
 }
 
 int cjoin(int tid) {
     init();
-    return SUCCESS_CODE;
+    if (blocked_join_get_thread_waiting_for(tid) != NULL){
+	//A thread ja esta sendo esperada, retorna erro
+	return ERROR_CODE;
+    }
+    TCB_t *thread = NULL;
+    if ((thread = blocked_join_get_thread(tid)) == NULL) {
+        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
+            if ((thread = ready_get_thread(tid)) == NULL) {
+               	//Thread nao existe, retorna erro.
+		return ERROR_CODE;
+	    }
+        }
+    }
+    //Thread que se deseja esperar o termino existe, nao e esperada e esta apontada pelo ponteiro thread.
+    DUPLA_t *new_cjoin = (DUPLA_t *) malloc(sizeof(DUPLA_t));
+    new_cjoin->waitedTid = tid;
+    new_cjoin->blockedThread = running_thread;
+    running_thread->state = PROCST_BLOQ;
+	
+    blocked_join_insert(new_cjoin);
+
+    return dispatch();
 }
 
 //------------------------------------------------------------------------------
