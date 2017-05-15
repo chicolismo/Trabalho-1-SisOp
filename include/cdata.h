@@ -21,6 +21,19 @@
 #define PROCST_EXEC 2
 #define PROCST_BLOQ 3
 #define PROCST_TERMINO  4
+
+/* como funciona o debug:
+para ativar, deixe 	#define DEBUG(X) printf X
+para desativar, deixe 	#define DEBUG(X) //printf X
+
+ex: DEBUG(("HELLO WORLD!!");
+
+se estiver ativado: 	DEBUG(X) se transforma em printf("HELLO WORLD!!");
+se estiver desativado: 	DEBUG(X) se transforma em //printf("HELLO WORLD!!");
+*/
+#define DEBUG(X) printf X
+
+
 //AVISO DO CECHIN NO DIA 9/5
 /*
 Pessoal,

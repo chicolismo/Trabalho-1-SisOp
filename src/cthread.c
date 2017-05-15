@@ -320,10 +320,13 @@ int ready_push(TCB_t *thread) {
 TCB_t *ready_shift() {
     TCB_t *th = NULL;
     int i;
+    DEBUG(("ready_shift>\n"));
     for (i = 0; i < 4; ++i) {
         if (FirstFila2(ready[i])==SUCCESS_CODE) {
+            DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:",i));
             th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
+            DEBUG(("%d\n",th->tid));
             break;
         }
     }
@@ -527,7 +530,10 @@ int dispatch() {
 		
 	int swapped_context = 0;
 
-	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.	
+    DEBUG(("****Dispatch**** \n"));
+
+	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
+        DEBUG(("Thread %d perdendo a execução. Status: %d\n", running_thread->tid, running_thread->state));	
 		getcontext(&(running_thread->context));
 	}
     
@@ -540,7 +546,7 @@ int dispatch() {
 			//Não existe thread a ser executada ou possui erro em sua geração.
 			return ERROR_CODE;
 		}
-        
+        DEBUG(("Thread %d está em execução.\n", running_thread->tid));
 		running_thread->state = PROCST_EXEC;
     	setcontext(&(running_thread->context));
 	}
@@ -556,19 +562,20 @@ void end_thread() {
     }
     
     int tid = running_thread->tid;
+    DEBUG(("Thread %d Acabando\n", tid));
     cdestroy(running_thread);
     // Procura pela thread que estava esperando esta aqui terminar.		
     DUPLA_t *waiting_thread = blocked_join_get_thread_waiting_for(tid);
 
     if (waiting_thread == NULL) {
-        //não há threads esperando pela tid.
+        DEBUG(("Não há threads esperando pela tid. \n"));
         dispatch();
     } else {
-        //Há uma thread esperando pelo fim dessa tid.
-
+        
+        DEBUG(("Há uma thread esperando pelo fim dessa tid.\n"));
         blocked_join_remove(waiting_thread);
         waiting_thread->blockedThread->state = PROCST_APTO;
-
+        DEBUG(("Thread %d estava esperando e foi inserida na fila de aptos.\n",waiting_thread->blockedThread->tid));
         ready_push(waiting_thread->blockedThread);
         dispatch();
 	}
@@ -739,19 +746,25 @@ int cyield() {
 
 int cjoin(int tid) {
     init();
+
+    DEBUG(("Inicio de join na thread %d pela thread %d\n", tid, running_thread->tid));    
+
     if (blocked_join_get_thread_waiting_for(tid) != NULL){
 	//A thread ja esta sendo esperada, retorna erro
 	return ERROR_CODE;
     }
     TCB_t *thread = NULL;
-    if ((thread = blocked_join_get_thread(tid)) == NULL) {
-        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
-            if ((thread = ready_get_thread(tid)) == NULL) {
+    if ((thread = blocked_join_get_thread(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
+        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
+            if ((thread = ready_get_thread(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
+                DEBUG(("Thread não existe.\n"));
                	//Thread nao existe, retorna erro.
 		return ERROR_CODE;
 	    }
         }
     }
+
+    DEBUG(("Thread existe e não é esperada.\n"));
     //Thread que se deseja esperar o termino existe, nao e esperada e esta apontada pelo ponteiro thread.
     DUPLA_t *new_cjoin = (DUPLA_t *) malloc(sizeof(DUPLA_t));
     new_cjoin->waitedTid = tid;
@@ -759,6 +772,8 @@ int cjoin(int tid) {
     running_thread->state = PROCST_BLOQ;
 	
     blocked_join_insert(new_cjoin);
+
+    debug_print_blocked_list();
 
     return dispatch();
 }
