@@ -65,216 +65,22 @@ TCB_t *running_thread = NULL;    // Executando
 ucontext_t *ending_ctx = NULL;
 
 
-/* par.c do estudo dirigido: forte inspiração para o dispatcher.
-void even(void) {
-    int i;
-
-     for (i =0; i <=10; i=i+2 )
-         printf("%3d", i);
-
-     return;
-
-     /* A funcaoo even ao terminar vai para a funcao indicada por:
-      * "setcontext(&even_context->uc_link);", ou seja, a main,
-      *  no retorno da chamada "getcontext(&main_context)"  
-} 
-
-int main(void)
-{
-
-    ucontext_t main_context, even_context;
-    char even_stack[SIGSTKSZ];   Pilha para o contexto even 
-    int ret_code;               /* Flag para identificar o tipo de retorno de getcontext 
- 
-    /* É necessario criar uma estrutura contexto a partir de um molde.
-     * O contexto da propria main serve como esse molde. 
-
-    getcontext(&even_context);
-
-    /* Modifica-se o molde o novo fluxo a ser criado. Cada fluxo
-     * de controle recebe para qual contexto ele deve ir quando acabar
-     * (uc_link), uma pilha (ss_sp) e o tamanho da mesma. 
-
-    even_context.uc_link          = &main_context;    
-    even_context.uc_stack.ss_sp   = even_stack;
-    even_context.uc_stack.ss_size = sizeof(even_stack);
-
-    /* Define ainda a funçao a ser executada pelo fluxo de controle,
-     * a quantidade (0, no caso) e os eventuais parametros que cada fluxo 
-     * recebe (nenhum). O typecast (void (*)(void)) sao para evitar warnings na
-     * compilacaoo e nao afeta o comportamento da funcao 
-
-    makecontext(&even_context, (void (*)(void)) even, 0); 
-
-    /* salva o contexto da main em main_context1. Quando a funcao "even" acabar
-     * o fluxo de controle sera retomado a partir deste ponto devido ao fato
-     * do campo uc_link (acima) estar apontando para main_context 
-    /------------------- A PARTIR DAQUI É UM MINI DISPATCHER ------------------------/
-    ret_code = 0;
-    getcontext(&main_context);
-
-    if (!ret_code) {
-       /* Testa a variavel even_finished para diferenciar se a funcaoo getcontext
-          anterior retornou via uc_link (se ret_code==1) depois do termino de 
-          even ou se ela retornou apos a sua chamada simples 
-
-        ret_code = 1;             
-        setcontext(&even_context); /* posiciona o contexto para even
-        printf("NUNCA sera executado!\n");
-        return(-1);   /* nunca sera executado! 
-    }
- 
-    printf("\n\n Terminando a main...\n");
-    return 0;
-}
-*/
-
-int dispatch() {
-		
-	int swapped_context = 0;
-
-	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.	
-		getcontext(&(running_thread->context));
-	}
-    
-	if (swapped_context == 0) {
-        // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
-		swapped_context = 1;
-		running_thread = ready_shift();
-
-		if (current_running_thread == NULL || current_running_thread->tid < 0) {
-			//Não existe thread a ser executada ou possui erro em sua geração.
-			return ERROR_CODE;
-		}
-        
-		running_thread->state = PROCST_EXEC;
-    	setcontext(&(running_thread->context));
-	}
-	return SUCCESS_CODE;
-}
-
-void end_thread() {
-    if (current_running_thread == NULL) {
-		//nao há thread em execução
-        return;
-    }
-    
-    int tid = running_thread->tid;
-    cdestroy(running_thread);
-    // Procura pela thread que estava esperando esta aqui terminar.		
-    DUPLA_t *waiting_thread = blocked_join_get_thread_waiting_for(tid);
-
-    if (waiting_thread == NULL) {
-        //não há threads esperando pela tid.
-        dispatch();
-    } else {
-        //Há uma thread esperando pelo fim dessa tid.
-
-        blocked_list_remove(waiting_thread);
-        waiting_thread->blockedThread->state = PROCST_APTO;
-
-        ready_push(waiting_thread->blockedThread);
-        dispatch();
-	}
-}
-
-int init_ending_ctx() {
-    ending_ctx = malloc(sizeof(ucontext_t));
-
-    if ((getcontext(ending_ctx) != 0) || ending_ctx == NULL) {
-        // Deu merda
-        return INIT_ENDING_CTX_ERROR;
-    }
-
-    ending_ctx->uc_stack.ss_sp = malloc(SIGSTKSZ);
-    ending_ctx->uc_stack.ss_size = SIGSTKSZ;
-    ending_ctx->uc_link = NULL; // Nada a fazer quando acabar
-
-    makecontext(ending_ctx, end_thread, 0);
-
-    return INIT_ENDING_CTX_SUCCESS;
-}
-
 //==============================================================================
 // Funções
 //==============================================================================
-
-/*
- * Esta função inicializa todas as variáveis globais das quais as outras
- * funções dependem.  Deve ser chamada nas outras funções, por garantia.
- */
-
-//------------------------------------------------------------------------------
-//Funcoes de inicialização
-//------------------------------------------------------------------------------
-
-int init_main_thread() {
-    //TODO: implementar a inicializacao da thread main.
-
-    TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
-
-	thread->tid = current_tid;
-	thread->prio = 0; //?????? nao sei qual a prioridade da thread main.
-	thread->state = PROCST_EXEC;
-
-	if (((thread->context).uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
-		//Sem espaço na memória para criar a TCB
-		return ERROR_CODE;
-	}
-
-	(thread->context).uc_stack.ss_size = SIGSTKSZ;
-	(thread->context).uc_link = NULL;  //Quando a thread main acaba o programa acaba.
-	current_running_thread = thread;  //Não é inserido em nenhuma fila, a thread simplesmente está em execução.
-    
-    //Não é necessário usar um makecontext, pois o contexto da thread é a propria main, que está em execução.
-	
-	return SUCCESS_CODE;
+//geracao e destruição de tid/tcb
+// Gera uma nova tid
+int generate_tid() {
+    return ++current_tid;
+}
+// Destrói a thread.
+void cdestroy(TCB_t *thread) {
+    running_thread->state = PROCST_TERMINO;
+	free(running_thread);  
+	running_thread = NULL;
+    return;
 }
 
-//------------------------------------------------------------------------------
-// Esta função inicializa todas as variáveis globais das quais as outras
-// funções dependem.  Deve ser chamada nas outras funções, por garantia.
-//------------------------------------------------------------------------------
-int init() {
-    if (!initialized_globals) {
-
-        initialized_globals = true;
-
-        // inicializar a thread main e colocar em executando.
-        if (init_main_thread() != SUCCESS_CODE) {
-            return ERROR_CODE;
-        }
-
-        // inicializar o contexto de finalizacao de thread.
-        if (init_end_context() != SUCCESS_CODE) {
-            return ERROR_CODE;
-        }
-
-        // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
-        // partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
-
-        // Inicializa as diversas filas de threads
-        size_t queue_size = sizeof(struct sFila2);
-        int i;
-        for (i = 0; i < 4; ++i) {
-            ready[i] = malloc(queue_size);
-            CreateFila2(ready[i]);
-        }
-        blocked_join = (FILA2 *)malloc(sizeof(FILA2));
-
-        if (CreateFila2(blocked_join) != SUCCESS_CODE) {
-            return ERROR_CODE;
-        }
-
-        blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
-        if (CreateFila2(blocked_semaphor) != SUCCESS_CODE) {
-            return ERROR_CODE;
-        }
-
-        return SUCCESS_CODE;
-    }
-    return SUCCESS_CODE;
-}
 
 //------------------------------------------------------------------------------
 //Funcoes da lista de bloqueados cjoin
@@ -374,6 +180,7 @@ void debug_print_blocked_list()
 	}
 	return;
 }
+
 //------------------------------------------------------------------------------
 //Funcoes de Semaforo
 //------------------------------------------------------------------------------
@@ -493,28 +300,6 @@ int debug_blocked_semaphor() {
     return 0;
 }
 
-
-/*
- * Gera uma nova tid
- */
-//------------------------------------------------------------------------------
-// Gera uma nova tid
-//------------------------------------------------------------------------------
-int generate_tid() {
-    return ++current_tid;
-}
-
-//------------------------------------------------------------------------------
-// Destrói a thread.
-// NOTE: Talvez não seja necessária
-//------------------------------------------------------------------------------
-void cdestroy(TCB_t *thread) {
-    current_running_thread->state = PROCST_TERMINO;
-	free(current_running_thread);  
-	current_running_thread = NULL;
-    return;
-}
-
 //==============================================================================
 // Filas de Aptos
 //==============================================================================
@@ -605,6 +390,191 @@ TCB_t *ready_remove(int tid) {
     }
     return NULL;
 }
+
+//------------------------------------------------------------------------------
+//Funcoes de inicialização
+//------------------------------------------------------------------------------
+
+int init_main_thread() {
+    //TODO: implementar a inicializacao da thread main.
+
+    TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
+
+	thread->tid = current_tid;
+	thread->prio = 0; //?????? nao sei qual a prioridade da thread main.
+	thread->state = PROCST_EXEC;
+
+	if (((thread->context).uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
+		//Sem espaço na memória para criar a TCB
+		return ERROR_CODE;
+	}
+
+	(thread->context).uc_stack.ss_size = SIGSTKSZ;
+	(thread->context).uc_link = NULL;  //Quando a thread main acaba o programa acaba.
+	running_thread = thread;  //Não é inserido em nenhuma fila, a thread simplesmente está em execução.
+    
+    //Não é necessário usar um makecontext, pois o contexto da thread é a propria main, que está em execução.
+	
+	return SUCCESS_CODE;
+}
+void end_thread();
+int init_ending_ctx() {
+    ending_ctx = malloc(sizeof(ucontext_t));
+
+    if ((getcontext(ending_ctx) != 0) || ending_ctx == NULL) {
+        // Deu merda
+        return INIT_ENDING_CTX_ERROR;
+    }
+
+    ending_ctx->uc_stack.ss_sp = malloc(SIGSTKSZ);
+    ending_ctx->uc_stack.ss_size = SIGSTKSZ;
+    ending_ctx->uc_link = NULL; // Nada a fazer quando acabar
+
+    makecontext(ending_ctx, end_thread, 0);
+
+    return INIT_ENDING_CTX_SUCCESS;
+}
+
+//------------------------------------------------------------------------------
+// Esta função inicializa todas as variáveis globais das quais as outras
+// funções dependem.  Deve ser chamada nas outras funções, por garantia.
+//------------------------------------------------------------------------------
+int init() {
+    if (!initialized_globals) {
+
+        initialized_globals = true;
+
+        // inicializar a thread main e colocar em executando.
+        if (init_main_thread() != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
+
+        // inicializar o contexto de finalizacao de thread.
+        if (init_ending_ctx() != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
+
+        // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
+        // partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
+
+        // Inicializa as diversas filas de threads
+        size_t queue_size = sizeof(struct sFila2);
+        int i;
+        for (i = 0; i < 4; ++i) {
+            ready[i] = malloc(queue_size);
+            CreateFila2(ready[i]);
+        }
+        blocked_join = (FILA2 *)malloc(sizeof(FILA2));
+
+        if (CreateFila2(blocked_join) != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
+
+        blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
+        if (CreateFila2(blocked_semaphor) != SUCCESS_CODE) {
+            return ERROR_CODE;
+        }
+
+        return SUCCESS_CODE;
+    }
+    return SUCCESS_CODE;
+}
+
+
+/* 
+Função Dispatcher :
+*************************************************************
+par.c do estudo dirigido: forte inspiração para o dispatcher.
+void even(void) {
+    [..]  
+} 
+
+int main(void)
+{
+
+    ucontext_t main_context, even_context;
+[...]
+ 
+     * É necessario criar uma estrutura contexto a partir de um molde.
+     * O contexto da propria main serve como esse molde. 
+
+    getcontext(&even_context);
+    even_context.uc_link          = &main_context;    
+    even_context.uc_stack.ss_sp   = even_stack;
+    even_context.uc_stack.ss_size = sizeof(even_stack);
+    makecontext(&even_context, (void (*)(void)) even, 0); 
+    /------------------- A PARTIR DAQUI É UM MINI DISPATCHER ------------------------/
+    ret_code = 0;
+    getcontext(&main_context);
+
+    if (!ret_code) {
+        * Testa a variavel even_finished para diferenciar se a funcaoo getcontext
+          anterior retornou via uc_link (se ret_code==1) depois do termino de 
+          even ou se ela retornou apos a sua chamada simples 
+
+        ret_code = 1;             
+        setcontext(&even_context);  * posiciona o contexto para even
+        printf("NUNCA sera executado!\n");
+        return(-1);    * nunca sera executado! 
+    }
+ 
+    printf("\n\n Terminando a main...\n");
+    return 0;
+}
+*/
+
+int dispatch() {
+		
+	int swapped_context = 0;
+
+	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.	
+		getcontext(&(running_thread->context));
+	}
+    
+	if (swapped_context == 0) {
+        // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
+		swapped_context = 1;
+		running_thread = ready_shift();
+
+		if (running_thread == NULL || running_thread->tid < 0) {
+			//Não existe thread a ser executada ou possui erro em sua geração.
+			return ERROR_CODE;
+		}
+        
+		running_thread->state = PROCST_EXEC;
+    	setcontext(&(running_thread->context));
+	}
+	return SUCCESS_CODE;
+}
+//*********************************
+// Função fim de thread
+//*********************************
+void end_thread() {
+    if (running_thread == NULL) {
+		//nao há thread em execução
+        return;
+    }
+    
+    int tid = running_thread->tid;
+    cdestroy(running_thread);
+    // Procura pela thread que estava esperando esta aqui terminar.		
+    DUPLA_t *waiting_thread = blocked_join_get_thread_waiting_for(tid);
+
+    if (waiting_thread == NULL) {
+        //não há threads esperando pela tid.
+        dispatch();
+    } else {
+        //Há uma thread esperando pelo fim dessa tid.
+
+        blocked_join_remove(waiting_thread);
+        waiting_thread->blockedThread->state = PROCST_APTO;
+
+        ready_push(waiting_thread->blockedThread);
+        dispatch();
+	}
+}
+
+
 //==============================================================================
 // Funções da biblioteca cthread
 //==============================================================================
