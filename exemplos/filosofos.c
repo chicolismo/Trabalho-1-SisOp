@@ -112,7 +112,7 @@ void *Philosophers(void *arg) {
 
 	*(status+2*i)='D';
 	state[i] = DONE;
-	return;
+	return NULL;
 }
 
 
@@ -133,7 +133,7 @@ int	main(int argc, char *argv[]) {
 	   }
 
 	for(i = 0; i < N; i++) {
-	   if (ThreadId[i] = ccreate(Philosophers, (void *)i)) {
+	   if (ThreadId[i] = ccreate(Philosophers, (void *)i,0)) {
 	      exit(0);
 	   }
 	}

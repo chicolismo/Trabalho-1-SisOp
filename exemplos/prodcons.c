@@ -75,11 +75,12 @@ int main(int argc, char *argv[ ]) {
     csem_init(&vazio, N);
     csem_init(&cheio, 0);
 
-    prod = ccreate((void *)produtor, (void *)NULL);
-    cons = ccreate((void *)consumidor, (void *)NULL);
+    prod = ccreate((void *)produtor, (void *)NULL,0);
+    cons = ccreate((void *)consumidor, (void *)NULL,0);
 
     cjoin(prod);
     cjoin(cons);
+    return 0;
 }
 
 

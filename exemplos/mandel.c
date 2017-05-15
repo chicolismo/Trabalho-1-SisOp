@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     }
 
     for (i=0; i<t; i++) {
-        workers[i] = ccreate(mandel, (void *)(&workload[i]));
+        workers[i] = ccreate(mandel, (void *)(&workload[i]),0);
         if (workers[i] == -1) 
            error("ERRO: Problema na criacao de thread worker\n");
     }

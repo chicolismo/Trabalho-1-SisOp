@@ -21,7 +21,7 @@ void *func(void *arg) {
         vetor[inc] = (int)arg;
         inc++;
         if ((inc % 20) == 0) {
-            piyield();
+            cyield();
         }
         else {
             continue;
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
 
     for (i = 0; i < MAX_THR; i++) {
-        pid[i] = ccreate(func, (void *)('A' + i));
+        pid[i] = ccreate(func, (void *)('A' + i),0);
         if (pid[i] == -1) {
             printf("ERRO: criação de thread!\n");
             exit(-1);

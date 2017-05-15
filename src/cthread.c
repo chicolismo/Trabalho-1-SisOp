@@ -308,8 +308,7 @@ int debug_blocked_semaphor() {
  * Apende nova thread nas filas de aptos
  */
 int ready_push(TCB_t *thread) {
-    FILA2 *queue = ready[thread->prio];
-    return AppendFila2(queue, (void *) thread);
+    return AppendFila2(ready[thread->prio], thread);
 }
 
 /*
@@ -322,7 +321,7 @@ TCB_t *ready_shift() {
     TCB_t *th = NULL;
     int i;
     for (i = 0; i < 4; ++i) {
-        if (FirstFila2(ready[i])) {
+        if (FirstFila2(ready[i])==SUCCESS_CODE) {
             th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
             break;
@@ -350,7 +349,7 @@ FindResult *ready_find(int tid) {
                 result->queue_number = i;
             }
         }
-        while (NextFila2(ready[i]));
+        while (NextFila2(ready[i])==0);
     }
     return result;
 }
@@ -361,16 +360,17 @@ TCB_t *ready_get_thread(int tid) {
     TCB_t *thread = NULL;
     int i;
     for (i = 0; i < 4; ++i) {
-        FirstFila2(ready[i]);
-        do {
-            thread = (TCB_t *)GetAtIteratorFila2(ready[i]);
-	    if(thread != NULL){	
-            	if (thread->tid == tid) {
-                    return thread;
-		}
+        if(FirstFila2(ready[i])==SUCCESS_CODE){
+            do {
+                thread = (TCB_t *)GetAtIteratorFila2(ready[i]);
+	            if(thread != NULL){	
+                	if (thread->tid == tid) {
+                        return thread;
+		            }
+                }
             }
+        while (NextFila2(ready[i])==0);
         }
-        while (NextFila2(ready[i]));
     }
     return NULL;
 }
