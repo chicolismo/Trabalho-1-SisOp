@@ -76,8 +76,8 @@ int generate_tid() {
 // Destrói a thread.
 void cdestroy(TCB_t *thread) {
     running_thread->state = PROCST_TERMINO;
-	free(running_thread);  
-	running_thread = NULL;
+    free(running_thread);
+    running_thread = NULL;
     return;
 }
 
@@ -134,7 +134,8 @@ TCB_t *blocked_join_get_thread(int tid) {
     }
 }
 
-DUPLA_t *blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacjoin está definida em queue.h
+DUPLA_t *blocked_join_get_thread_waiting_for(int
+        tid) { //essa estrutura Duplacjoin está definida em queue.h
     //funcao que procura por um tid esperado na lista de duplas da fila cjoin,
     //pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
     //retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
@@ -157,28 +158,30 @@ DUPLA_t *blocked_join_get_thread_waiting_for(int tid) { //essa estrutura Duplacj
     }
 }
 
-void debug_print_blocked_list()
-{
-	DUPLA_t *print;	
-	if (FirstFila2(blocked_join) == 0) {
-		printf("##################################################\n");
-		printf("############### FILA DE BLOQUEADOS ###############\n");
-		printf("##################################################\n");
-		do
-		{
-			print = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
-			if(print == NULL) break;
-			if(print->blockedThread != NULL){
-				printf("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid, print->waitedTid);
-			}
-			else {
-				printf("# tid bloqueado: atual  / esperando pelo tid: %d # \n",print->waitedTid);
-			}
-		} while (NextFila2(blocked_join) == 0);
-		printf("##################################################\n");
-		return;
-	}
-	return;
+void debug_print_blocked_list() {
+    DUPLA_t *print;
+    if (FirstFila2(blocked_join) == 0) {
+        printf("##################################################\n");
+        printf("############### FILA DE BLOQUEADOS ###############\n");
+        printf("##################################################\n");
+        do {
+            print = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
+            if (print == NULL) {
+                break;
+            }
+            if (print->blockedThread != NULL) {
+                printf("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid,
+                       print->waitedTid);
+            }
+            else {
+                printf("# tid bloqueado: atual  / esperando pelo tid: %d # \n", print->waitedTid);
+            }
+        }
+        while (NextFila2(blocked_join) == 0);
+        printf("##################################################\n");
+        return;
+    }
+    return;
 }
 
 //------------------------------------------------------------------------------
@@ -322,11 +325,11 @@ TCB_t *ready_shift() {
     int i;
     DEBUG(("ready_shift>\n"));
     for (i = 0; i < 4; ++i) {
-        if (FirstFila2(ready[i])==SUCCESS_CODE) {
-            DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:",i));
+        if (FirstFila2(ready[i]) == SUCCESS_CODE) {
+            DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:", i));
             th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
-            DEBUG(("%d\n",th->tid));
+            DEBUG(("%d\n", th->tid));
             break;
         }
     }
@@ -352,7 +355,7 @@ FindResult *ready_find(int tid) {
                 result->queue_number = i;
             }
         }
-        while (NextFila2(ready[i])==0);
+        while (NextFila2(ready[i]) == 0);
     }
     return result;
 }
@@ -363,16 +366,16 @@ TCB_t *ready_get_thread(int tid) {
     TCB_t *thread = NULL;
     int i;
     for (i = 0; i < 4; ++i) {
-        if(FirstFila2(ready[i])==SUCCESS_CODE){
+        if (FirstFila2(ready[i]) == SUCCESS_CODE) {
             do {
                 thread = (TCB_t *)GetAtIteratorFila2(ready[i]);
-	            if(thread != NULL){	
-                	if (thread->tid == tid) {
+                if (thread != NULL) {
+                    if (thread->tid == tid) {
                         return thread;
-		            }
+                    }
                 }
             }
-        while (NextFila2(ready[i])==0);
+            while (NextFila2(ready[i]) == 0);
         }
     }
     return NULL;
@@ -403,22 +406,23 @@ int init_main_thread() {
 
     TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
 
-	thread->tid = current_tid;
-	thread->prio = 0; //?????? nao sei qual a prioridade da thread main.
-	thread->state = PROCST_EXEC;
+    thread->tid = current_tid;
+    thread->prio = 0; //?????? nao sei qual a prioridade da thread main.
+    thread->state = PROCST_EXEC;
 
-	if (((thread->context).uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
-		//Sem espaço na memória para criar a TCB
-		return ERROR_CODE;
-	}
+    if (((thread->context).uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
+        //Sem espaço na memória para criar a TCB
+        return ERROR_CODE;
+    }
 
-	(thread->context).uc_stack.ss_size = SIGSTKSZ;
-	(thread->context).uc_link = NULL;  //Quando a thread main acaba o programa acaba.
-	running_thread = thread;  //Não é inserido em nenhuma fila, a thread simplesmente está em execução.
-    
+    (thread->context).uc_stack.ss_size = SIGSTKSZ;
+    (thread->context).uc_link = NULL;  //Quando a thread main acaba o programa acaba.
+    running_thread =
+        thread;  //Não é inserido em nenhuma fila, a thread simplesmente está em execução.
+
     //Não é necessário usar um makecontext, pois o contexto da thread é a propria main, que está em execução.
-	
-	return SUCCESS_CODE;
+
+    return SUCCESS_CODE;
 }
 void end_thread();
 int init_ending_ctx() {
@@ -484,101 +488,105 @@ int init() {
 }
 
 
-/* 
+/*
 Função Dispatcher :
 *************************************************************
 par.c do estudo dirigido: forte inspiração para o dispatcher.
 void even(void) {
-    [..]  
-} 
+    [..]
+}
 
 int main(void)
 {
 
     ucontext_t main_context, even_context;
 [...]
- 
+
      * É necessario criar uma estrutura contexto a partir de um molde.
-     * O contexto da propria main serve como esse molde. 
+     * O contexto da propria main serve como esse molde.
 
     getcontext(&even_context);
-    even_context.uc_link          = &main_context;    
+    even_context.uc_link          = &main_context;
     even_context.uc_stack.ss_sp   = even_stack;
     even_context.uc_stack.ss_size = sizeof(even_stack);
-    makecontext(&even_context, (void (*)(void)) even, 0); 
+    makecontext(&even_context, (void (*)(void)) even, 0);
     /------------------- A PARTIR DAQUI É UM MINI DISPATCHER ------------------------/
     ret_code = 0;
     getcontext(&main_context);
 
     if (!ret_code) {
         * Testa a variavel even_finished para diferenciar se a funcaoo getcontext
-          anterior retornou via uc_link (se ret_code==1) depois do termino de 
-          even ou se ela retornou apos a sua chamada simples 
+          anterior retornou via uc_link (se ret_code==1) depois do termino de
+          even ou se ela retornou apos a sua chamada simples
 
-        ret_code = 1;             
+        ret_code = 1;
         setcontext(&even_context);  * posiciona o contexto para even
         printf("NUNCA sera executado!\n");
-        return(-1);    * nunca sera executado! 
+        return(-1);    * nunca sera executado!
     }
- 
+
     printf("\n\n Terminando a main...\n");
     return 0;
 }
 */
 
 int dispatch() {
-		
-	int swapped_context = 0;
+
+    int swapped_context = 0;
 
     DEBUG(("****Dispatch**** \n"));
 
-	if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
-        DEBUG(("Thread %d perdendo a execução. Status: %d\n", running_thread->tid, running_thread->state));	
-		getcontext(&(running_thread->context));
-	}
-    
-	if (swapped_context == 0) {
-        // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
-		swapped_context = 1;
-		running_thread = ready_shift();
+    if (running_thread !=
+            NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
+        DEBUG(("Thread %d perdendo a execução. Status: %d\n", running_thread->tid,
+               running_thread->state));
+        getcontext(&(running_thread->context));
+    }
 
-		if (running_thread == NULL || running_thread->tid < 0) {
-			//Não existe thread a ser executada ou possui erro em sua geração.
-			return ERROR_CODE;
-		}
+    if (swapped_context == 0) {
+        // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
+        swapped_context = 1;
+        running_thread = ready_shift();
+
+        if (running_thread == NULL || running_thread->tid < 0) {
+            //Não existe thread a ser executada ou possui erro em sua geração.
+            return ERROR_CODE;
+        }
         DEBUG(("Thread %d está em execução.\n", running_thread->tid));
-		running_thread->state = PROCST_EXEC;
-    	setcontext(&(running_thread->context));
-	}
-	return SUCCESS_CODE;
+        running_thread->state = PROCST_EXEC;
+        setcontext(&(running_thread->context));
+    }
+    return SUCCESS_CODE;
 }
 //*********************************
 // Função fim de thread
 //*********************************
 void end_thread() {
     if (running_thread == NULL) {
-		//nao há thread em execução
+        //nao há thread em execução
         return;
     }
-    
+
     int tid = running_thread->tid;
     DEBUG(("Thread %d Acabando\n", tid));
     cdestroy(running_thread);
-    // Procura pela thread que estava esperando esta aqui terminar.		
+    // Procura pela thread que estava esperando esta aqui terminar.
     DUPLA_t *waiting_thread = blocked_join_get_thread_waiting_for(tid);
 
     if (waiting_thread == NULL) {
         DEBUG(("Não há threads esperando pela tid. \n"));
         dispatch();
-    } else {
-        
+    }
+    else {
+
         DEBUG(("Há uma thread esperando pelo fim dessa tid.\n"));
         blocked_join_remove(waiting_thread);
         waiting_thread->blockedThread->state = PROCST_APTO;
-        DEBUG(("Thread %d estava esperando e foi inserida na fila de aptos.\n",waiting_thread->blockedThread->tid));
+        DEBUG(("Thread %d estava esperando e foi inserida na fila de aptos.\n",
+               waiting_thread->blockedThread->tid));
         ready_push(waiting_thread->blockedThread);
         dispatch();
-	}
+    }
 }
 
 
@@ -724,11 +732,11 @@ int csetprio(int tid, int prio) {
 
     if (thread_in_ready) {
         //TODO: remoção da fila de aptos, troca de prioridade e reinserçao na fila de aptos.
-	thread = ready_remove(thread->tid);
-	if(thread != NULL){
-		thread->prio = prio;
-		ready_push(thread);
-	}
+        thread = ready_remove(thread->tid);
+        if (thread != NULL) {
+            thread->prio = prio;
+            ready_push(thread);
+        }
     }
     else {
         thread->prio = prio;
@@ -747,20 +755,23 @@ int cyield() {
 int cjoin(int tid) {
     init();
 
-    DEBUG(("Inicio de join na thread %d pela thread %d\n", tid, running_thread->tid));    
+    DEBUG(("Inicio de join na thread %d pela thread %d\n", tid, running_thread->tid));
 
-    if (blocked_join_get_thread_waiting_for(tid) != NULL){
-	//A thread ja esta sendo esperada, retorna erro
-	return ERROR_CODE;
+    if (blocked_join_get_thread_waiting_for(tid) != NULL) {
+        //A thread ja esta sendo esperada, retorna erro
+        return ERROR_CODE;
     }
     TCB_t *thread = NULL;
-    if ((thread = blocked_join_get_thread(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
-        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
-            if ((thread = ready_get_thread(tid)) == NULL) {DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
+    if ((thread = blocked_join_get_thread(tid)) == NULL) {
+        DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
+        if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
+            DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
+            if ((thread = ready_get_thread(tid)) == NULL) {
+                DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
                 DEBUG(("Thread não existe.\n"));
-               	//Thread nao existe, retorna erro.
-		return ERROR_CODE;
-	    }
+                //Thread nao existe, retorna erro.
+                return ERROR_CODE;
+            }
         }
     }
 
@@ -770,7 +781,7 @@ int cjoin(int tid) {
     new_cjoin->waitedTid = tid;
     new_cjoin->blockedThread = running_thread;
     running_thread->state = PROCST_BLOQ;
-	
+
     blocked_join_insert(new_cjoin);
 
     debug_print_blocked_list();
