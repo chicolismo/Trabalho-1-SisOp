@@ -133,7 +133,7 @@ int	main(int argc, char *argv[]) {
 	   }
 
 	for(i = 0; i < N; i++) {
-	   if (ThreadId[i] = ccreate(Philosophers, (void *)i,0)) {
+	   if ((ThreadId[i] = ccreate(Philosophers, (void *)i,0))>=0) {
 	      exit(0);
 	   }
 	}
@@ -143,5 +143,6 @@ int	main(int argc, char *argv[]) {
 	for(i = 0; i < N; i++)
 	   ret = cjoin(ThreadId[i]);
 
-        printf("\n# Diner ends... All philosophers goes to sleep...\n\n\n");	   
+        printf("\n# Diner ends... All philosophers goes to sleep...\n\n\n");
+	return 0;	   
 }

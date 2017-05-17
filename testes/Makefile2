@@ -1,0 +1,48 @@
+#
+# Makefile dos TESTES
+#
+
+CC=gcc
+LIB_DIR=../lib
+INC_DIR=../include
+BIN_DIR=../bin
+SRC_DIR=../src
+
+TST_FLS = $(wildcard *c)
+TST_EXE = $(TST_FLS:.c=) = $(TST_FLS:.c=)
+
+# Target para gerar todos os tests
+all: aptos cidentify teste1 teste2 teste3 teste4 teste5
+
+# Testes
+aptos: warning aptos.c $(LIB_DIR)/libcthread.a
+	$(CC) -o aptos aptos.c -L$(LIB_DIR) -lcthread -lm -Wall
+
+cidentify: cidentify.c $(LIB_DIR)/libcthread.a
+	$(CC) -o cidentify cidentify.c -L$(LIB_DIR) -lcthread -lm -Wall
+
+teste1: Teste1.c $(LIB_DIR)/libcthread.a
+	$(CC) -o teste1 Teste1.c -L$(LIB_DIR) -lcthread -lm -Wall
+
+teste2: Teste2.c $(LIB_DIR)/libcthread.a
+	$(CC) -o teste2 Teste2.c -L$(LIB_DIR) -lcthread -lm -Wall
+
+teste3: Teste3.c $(LIB_DIR)/libcthread.a
+	$(CC) -o teste3 Teste3.c -L$(LIB_DIR) -lcthread -lm -Wall
+
+teste4: Teste4.c $(LIB_DIR)/libcthread.a
+	$(CC) -o teste4 Teste4.c -L$(LIB_DIR) -lcthread -lm -Wall
+	
+teste5: Teste5.c $(LIB_DIR)/libcthread.a
+	$(CC) -o teste5 Teste5.c -L$(LIB_DIR) -lcthread -lm -Wall
+	
+# Mensagem
+warning:
+	@echo -n "\nATENÇÃO: Este teste usa funções privadas da biblioteca a fim de testa-las, desconsiderar este tipo de warning!\n\n"
+
+# Clean
+clean:
+	rm -rf aptos cidentify teste1 teste2 teste3 teste4 teste5 *.o *~
+
+# Print para testar makefile
+print-%: ; @echo $* = $($*)

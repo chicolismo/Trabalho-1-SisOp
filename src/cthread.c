@@ -161,24 +161,23 @@ DUPLA_t *blocked_join_get_thread_waiting_for(int
 void debug_print_blocked_list() {
     DUPLA_t *print;
     if (FirstFila2(blocked_join) == 0) {
-        printf("##################################################\n");
-        printf("############### FILA DE BLOQUEADOS ###############\n");
-        printf("##################################################\n");
+        DEBUG(("##################################################\n"));
+        DEBUG(("############### FILA DE BLOQUEADOS ###############\n"));
+        DEBUG(("##################################################\n"));
         do {
             print = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
             if (print == NULL) {
                 break;
             }
             if (print->blockedThread != NULL) {
-                printf("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid,
-                       print->waitedTid);
+                DEBUG(("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid, print->waitedTid));
             }
             else {
-                printf("# tid bloqueado: atual  / esperando pelo tid: %d # \n", print->waitedTid);
+                DEBUG(("# tid bloqueado: atual  / esperando pelo tid: %d # \n", print->waitedTid));
             }
         }
         while (NextFila2(blocked_join) == 0);
-        printf("##################################################\n");
+        DEBUG(("##################################################\n"));
         return;
     }
     return;
@@ -273,7 +272,7 @@ int debug_blocked_semaphor() {
     int i = 1;
     int t;
     //função que imprime a lista de semaforos em detalhes.
-    printf("========== DEBUG SEMAPHORE LIST ==========\n");
+    DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     if (FirstFila2(blocked_semaphor) == 0) {
         do {
             printf("==                                      ==\n");
@@ -287,7 +286,7 @@ int debug_blocked_semaphor() {
                     }
                 }
                 while (NextFila2(value->fila) == 0);
-                printf("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t);
+                DEBUG(("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t));
                 i++;
             }
         }
@@ -296,10 +295,10 @@ int debug_blocked_semaphor() {
 
     }
     else {
-        printf("========== NÃO HÁ LISTA SEMÁFORO =========\n");
+        DEBUG(("========== NÃO HÁ LISTA SEMÁFORO =========\n"));
 
     }
-    printf("========== DEBUG SEMAPHORE LIST ==========\n");
+    DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     return 0;
 }
 
@@ -746,6 +745,7 @@ int csetprio(int tid, int prio) {
 
 int cyield() {
     init();
+    DEBUG(("cyield>\n Thread %d cedendo a execução voluntariamente.\n",running_thread->tid));
 
     running_thread->state = PROCST_APTO;
     ready_push(running_thread);
@@ -794,6 +794,7 @@ int cjoin(int tid) {
 //------------------------------------------------------------------------------
 int csem_init(csem_t *sem, int count) {
     init();
+    DEBUG(("csem_init>\n"));
     if (sem == NULL) {
         //printf("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n");
         return CSEM_INIT_ERROR;
@@ -809,8 +810,9 @@ int csem_init(csem_t *sem, int count) {
     sem->fila = (FILA2 *)malloc(sizeof(FILA2));
 
     //insere o semáforo na lista de semáforos
-    //printf("inserindo semaforo na fila de semaforos.\n");
+    DEBUG(("inserindo semaforo inicializado na fila de semaforos.\n"));
     if (insert_semaphore_on_blocked_semaphor(sem) == 0) {
+        debug_blocked_semaphor();
         return CreateFila2(sem->fila);
     }
     else {
@@ -824,22 +826,23 @@ int csem_init(csem_t *sem, int count) {
 */
 int cwait(csem_t *sem) {
     init();
-
+    DEBUG(("cwait>\n"));
     if ((sem == NULL) || (sem->fila == NULL)) {
         // Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
         return ERROR_CODE;
     }
 
     if (sem->count > 0) {
-        // O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo.
+        DEBUG(("O recurso NÃO ESTÁ sendo usado, então a thread vai usá-lo..\n"));
         sem->count -= 1;
         return SUCCESS_CODE;
     }
     else {
-        // O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.
+        DEBUG(("O recurso JÁ ESTÁ sendo usado, então precisamos bloquear a thread.\n"));
         sem->count -= 1;
         running_thread->state = PROCST_BLOQ;
         semaphore_queue_insert_thread(sem, running_thread);
+        DEBUG(("Thread bloqueada e inserida na fila do semáforo.\n"));
         dispatch();
     }
     return SUCCESS_CODE;
@@ -850,6 +853,7 @@ int cwait(csem_t *sem) {
  */
 int csignal(csem_t *sem) {
     init();
+    DEBUG(("csignal>\n"));
     if ((sem == NULL) || (sem->fila == NULL)) {
         //Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
         return ERROR_CODE;

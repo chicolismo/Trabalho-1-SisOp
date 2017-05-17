@@ -31,7 +31,7 @@ ex: DEBUG(("HELLO WORLD!!");
 se estiver ativado: 	DEBUG(X) se transforma em printf("HELLO WORLD!!");
 se estiver desativado: 	DEBUG(X) se transforma em //printf("HELLO WORLD!!");
 */
-#define DEBUG(X) printf X
+#define DEBUG(X) //printf X
 
 
 //AVISO DO CECHIN NO DIA 9/5
