@@ -1,6 +1,7 @@
 /*
 
-Teste Join.
+Teste6.c
+É possivel criar qualquer situação dentro da biblioteca e testar suas funcionalidades.
 
 
 */
