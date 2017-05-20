@@ -76,10 +76,10 @@ int main()
 	if((csem_init(&semaforo,1))!=0)
 		return 1;
 	
-	tcb1 = ccreate(func1, (void *)&i);
-	tcb2 = ccreate(func2, (void *)&i);
-	tcb3 = ccreate(func3, (void *)&i);
-	tcb4 = ccreate(func4, (void *)&i);
+	tcb1 = ccreate(func1, (void *)&i,0);
+	tcb2 = ccreate(func2, (void *)&i,0);
+	tcb3 = ccreate(func3, (void *)&i,0);
+	tcb4 = ccreate(func4, (void *)&i,0);
 	printf("Eu sou a thread Main e vou dar join na thread 1.\n");
 	if(cjoin(tcb1)==0)
 	{

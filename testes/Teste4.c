@@ -32,11 +32,11 @@ int main	(int argc, char *argv[]) {
 
     csem_init(&sem, 1);
 
-    id1 = ccreate((void*(*)(void*))func, (void *)&t1);
-    id2 = ccreate((void*(*)(void*))func, (void *)&t2);
-    id3 = ccreate((void*(*)(void*))func, (void *)&t3);
-    id4 = ccreate((void*(*)(void*))func, (void *)&t4);
-
+    id1 = ccreate((void*(*)(void*))func, (void *)&t1,0);
+    id2 = ccreate((void*(*)(void*))func, (void *)&t2,0);
+    id3 = ccreate((void*(*)(void*))func, (void *)&t3,0);
+    id4 = ccreate((void*(*)(void*))func, (void *)&t4,0);
+    printf("***\n O valor de sem.coun nos parenteses exibe o valor antes do cwait. \n****\n");
 	cjoin(id1); cjoin(id2); cjoin(id3); cjoin(id4);
 
     printf("[MAIN] voltando para terminar Resultado: soma = %d.\n", soma);

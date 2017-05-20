@@ -275,7 +275,7 @@ int debug_blocked_semaphor() {
     DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     if (FirstFila2(blocked_semaphor) == 0) {
         do {
-            printf("==                                      ==\n");
+            DEBUG(("==                                      ==\n"));
             csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
             if (value != NULL) {
                 t = 0;
@@ -298,7 +298,7 @@ int debug_blocked_semaphor() {
         DEBUG(("========== NÃO HÁ LISTA SEMÁFORO =========\n"));
 
     }
-    DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
+   DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     return 0;
 }
 
@@ -322,13 +322,13 @@ int ready_push(TCB_t *thread) {
 TCB_t *ready_shift() {
     TCB_t *th = NULL;
     int i;
-    DEBUG(("ready_shift>\n"));
+    //DEBUG(("ready_shift>\n"));
     for (i = 0; i < 4; ++i) {
         if (FirstFila2(ready[i]) == SUCCESS_CODE) {
-            DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:", i));
+            //DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:", i));
             th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
-            DEBUG(("%d\n", th->tid));
+            //DEBUG(("%d\n", th->tid));
             break;
         }
     }
@@ -388,10 +388,26 @@ TCB_t *ready_get_thread(int tid) {
  * Caso ele não seja encontrado, nada acontece e NULL é retornado.
  */
 TCB_t *ready_remove(int tid) {
-    FindResult *result = ready_find(tid);
+    //FindResult *result = ready_find(tid); dando segmentation fault
+    TCB_t *thread = NULL;
+    TCB_t *result = ready_get_thread(tid);
     if (result != NULL) {
-        DeleteAtIteratorFila2(ready[result->queue_number]);
-        return (TCB_t *)(result->node->node);
+        //DeleteAtIteratorFila2(ready[result->queue_number]);
+        
+        if (FirstFila2(ready[result->prio]) == SUCCESS_CODE) {
+            do {
+                thread = (TCB_t *)GetAtIteratorFila2(ready[result->prio]);
+                if (thread != NULL) {
+                    if (thread->tid == tid) {
+                        DeleteAtIteratorFila2(ready[result->prio]);
+                    }
+                }
+            }
+            while (NextFila2(ready[result->prio]) == 0);
+            //return (TCB_t *)(result->node->node);
+            return result;
+            }
+    
     }
     return NULL;
 }
@@ -533,12 +549,10 @@ int dispatch() {
 
     int swapped_context = 0;
 
-    DEBUG(("****Dispatch**** \n"));
+    DEBUG(("===Dispatch=== \n"));
 
-    if (running_thread !=
-            NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
-        DEBUG(("Thread %d perdendo a execução. Status: %d\n", running_thread->tid,
-               running_thread->state));
+    if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
+        DEBUG(("Thread %d perdendo a execução. ", running_thread->tid));
         getcontext(&(running_thread->context));
     }
 
@@ -691,6 +705,7 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     if ((thread->context.uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
         return CCREATE_ERROR;
     }
+    DEBUG(("Ccreate> Criando thread %d\n",thread->tid));
 
     // NOTE: Descobrir o que fazer com o resto do contexto.
     // th->context.uc_link  ->> contexto de finalização
@@ -710,6 +725,8 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
 int csetprio(int tid, int prio) {
     init();
     bool thread_in_ready = false;
+    DEBUG(("csetprio>\n"));
+    DEBUG(("Alterando prioridade da thread %i para %i\n",tid,prio));
 
     if (prio < 0 || prio > 3) {
         //prioridade nao esta no intervalo [0,3]
@@ -719,10 +736,10 @@ int csetprio(int tid, int prio) {
     if ((thread = blocked_join_get_thread(tid)) == NULL) {
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
             if ((thread = ready_get_thread(tid)) == NULL) {
-                //Thread a ser modificada não existe.
+                DEBUG(("Thread a ser modificada não existe.\n"));
                 return ERROR_CODE;
             }
-            else {//thread encontrada na fila de aptos.
+            else {
                 thread_in_ready = true;
             }
         }
@@ -755,7 +772,7 @@ int cyield() {
 int cjoin(int tid) {
     init();
 
-    DEBUG(("Inicio de join na thread %d pela thread %d\n", tid, running_thread->tid));
+    DEBUG(("Cjoin> join na thread %d pela thread %d\n", tid, running_thread->tid));
 
     if (blocked_join_get_thread_waiting_for(tid) != NULL) {
         //A thread ja esta sendo esperada, retorna erro
@@ -763,11 +780,11 @@ int cjoin(int tid) {
     }
     TCB_t *thread = NULL;
     if ((thread = blocked_join_get_thread(tid)) == NULL) {
-        DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
+        //DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
-            DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
+            //DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
             if ((thread = ready_get_thread(tid)) == NULL) {
-                DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
+                //DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
                 DEBUG(("Thread não existe.\n"));
                 //Thread nao existe, retorna erro.
                 return ERROR_CODE;
