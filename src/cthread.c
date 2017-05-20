@@ -412,6 +412,28 @@ TCB_t *ready_remove(int tid) {
     return NULL;
 }
 
+void debug_ready() {
+    int i;
+    TCB_t *print;
+    DEBUG(("##################################################\n"));
+    DEBUG(("###############   FILA DE APTOS    ###############\n"));
+    DEBUG(("##################################################\n"));
+    for (i = 0; i < 4; ++i) {
+        if (FirstFila2(ready[i]) == SUCCESS_CODE) {
+            DEBUG(("# Prioridade %d\n", i));
+            DEBUG(("# Tids na fila: \n"));
+            do {
+                print = (TCB_t *)GetAtIteratorFila2(ready[i]);
+                if (print != NULL) {
+                    DEBUG(("# %d\n", print->tid));
+                    }
+            }while (NextFila2(ready[i]) == 0);
+            DEBUG(("##################################################\n"));
+        }
+    }
+    return;
+}
+
 //------------------------------------------------------------------------------
 //Funcoes de inicialização
 //------------------------------------------------------------------------------
@@ -736,7 +758,12 @@ int csetprio(int tid, int prio) {
     if ((thread = blocked_join_get_thread(tid)) == NULL) {
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
             if ((thread = ready_get_thread(tid)) == NULL) {
-                DEBUG(("Thread a ser modificada não existe.\n"));
+                if(running_thread->tid == tid){ 
+                    thread = running_thread;
+                    }
+                else{
+                    DEBUG(("Thread a ser modificada não existe.\n"));
+                }
                 return ERROR_CODE;
             }
             else {
@@ -775,7 +802,7 @@ int cjoin(int tid) {
     DEBUG(("Cjoin> join na thread %d pela thread %d\n", tid, running_thread->tid));
 
     if (blocked_join_get_thread_waiting_for(tid) != NULL) {
-        //A thread ja esta sendo esperada, retorna erro
+        DEBUG(("A thread ja esta sendo esperada.\n"));
         return ERROR_CODE;
     }
     TCB_t *thread = NULL;
@@ -813,21 +840,19 @@ int csem_init(csem_t *sem, int count) {
     init();
     DEBUG(("csem_init>\n"));
     if (sem == NULL) {
-        //printf("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n");
+        DEBUG(("Nao e possivel inicializar um ponteiro para um semaforo nulo.\n"));
         return CSEM_INIT_ERROR;
     }
     if (sem->fila != NULL) {
-        //printf("Nao e possivel inicializar um semaforo ja inicializado.\n");
+        DEBUG(("Nao e possivel inicializar um semaforo ja inicializado.\n"));
         return CSEM_INIT_ERROR;
     }
-    //printf("Inicializando a contagem do semáforo\n");
     sem->count = count;
 
     //printf("Inicializando a fila referente ao semáforo.\n");
     sem->fila = (FILA2 *)malloc(sizeof(FILA2));
 
     //insere o semáforo na lista de semáforos
-    DEBUG(("inserindo semaforo inicializado na fila de semaforos.\n"));
     if (insert_semaphore_on_blocked_semaphor(sem) == 0) {
         debug_blocked_semaphor();
         return CreateFila2(sem->fila);
@@ -845,7 +870,7 @@ int cwait(csem_t *sem) {
     init();
     DEBUG(("cwait>\n"));
     if ((sem == NULL) || (sem->fila == NULL)) {
-        // Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+        DEBUG(("Não é possivel dar wait em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.\n"));
         return ERROR_CODE;
     }
 
