@@ -270,7 +270,6 @@ TCB_t *get_thread_from_blocked_semaphor(int tid) {
 
 int debug_blocked_semaphor() {
     int i = 1;
-    int t;
     //função que imprime a lista de semaforos em detalhes.
     DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     if (FirstFila2(blocked_semaphor) == 0) {
@@ -278,15 +277,16 @@ int debug_blocked_semaphor() {
             DEBUG(("==                                      ==\n"));
             csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
             if (value != NULL) {
-                t = 0;
-                do {
-                    TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
-                    if (value2 != NULL) {
-                        t++;
-                    }
+                DEBUG(("== Semaforo %2i. Count = %2i               ==\n", i, value->count));
+                if(FirstFila2(value->fila) == 0){
+                    DEBUG(("Tids bloqueados:\n"));                
+                    do{
+                        TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
+                        if(value2 != NULL){                        
+                            DEBUG(("%d\n",value2->tid));
+                        }
+                    }while(NextFila2(value->fila) == 0);
                 }
-                while (NextFila2(value->fila) == 0);
-                DEBUG(("== Semaforo %2i. Count = %2i b.threads= %2i==\n", i, value->count, t));
                 i++;
             }
         }
@@ -759,7 +759,8 @@ int csetprio(int tid, int prio) {
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
             if ((thread = ready_get_thread(tid)) == NULL) {
                 if(running_thread->tid == tid){ 
-                    thread = running_thread;
+                    running_thread->prio = prio;
+                    return SUCCESS_CODE;
                     }
                 else{
                     DEBUG(("Thread a ser modificada não existe.\n"));
