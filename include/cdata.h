@@ -53,7 +53,7 @@ typedef struct s_TCB {
     //***********************************************************************************
 
     // Prioridade da thread, para uso do escalonador
-    int prio;
+    int ticket;
 
     // contexto de execução da thread (SP, PC, GPRs e recursos)
     ucontext_t  context;

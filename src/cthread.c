@@ -342,7 +342,7 @@ void debug_blocked_semaphor() {
  * Apende nova thread nas filas de aptos
  */
 int ready_push(TCB_t *thread) {
-    return AppendFila2(ready[thread->prio], thread);
+    return AppendFila2(ready[thread->ticket], thread);
 }
 
 /*
@@ -399,15 +399,15 @@ TCB_t *ready_remove(int tid) {
     TCB_t *thread = NULL;
     TCB_t *result = ready_get_thread(tid);
     if (result != NULL) {
-        if (FirstFila2(ready[result->prio]) == SUCCESS_CODE) {
+        if (FirstFila2(ready[result->ticket]) == SUCCESS_CODE) {
             do {
-                thread = (TCB_t *)GetAtIteratorFila2(ready[result->prio]);
+                thread = (TCB_t *)GetAtIteratorFila2(ready[result->ticket]);
                 if (thread != NULL) {
                     if (thread->tid == tid) {
-                        DeleteAtIteratorFila2(ready[result->prio]);
+                        DeleteAtIteratorFila2(ready[result->ticket]);
                     }
                 }
-            } while (NextFila2(ready[result->prio]) == 0);
+            } while (NextFila2(ready[result->ticket]) == 0);
             return result;
         }
     }
@@ -446,7 +446,7 @@ int init_main_thread() {
     // Inicializacao da thread main.
     TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
     thread->tid = current_tid;
-    thread->prio = 0; // Thread main terá a maior prioridade.
+    thread->ticket = 0; // Thread main terá a maior prioridade.
     thread->state = PROCST_EXEC;
 
     // Criação da pilha da main.
@@ -703,7 +703,7 @@ void end_thread() {
  *  (Obs.: é um único parâmetro. Se for necessário passar mais de um valor
  *  deve-se empregar um ponteiro para uma struct)
  *
- *  prio: prioridade com que deve ser criada a thread.
+ *  ticket: prioridade com que deve ser criada a thread.
  *
  * Retorno:
  *  Quando executada corretamente: retorna um valor positivo, que representa o
@@ -717,7 +717,7 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
 
     thread->tid = new_tid;
-    thread->prio = priority;
+    thread->ticket = priority;
     thread->state = PROCST_CRIACAO;
 
     getcontext(&(thread->context));
@@ -752,7 +752,7 @@ int csetprio(int tid, int prio) {
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
             if ((thread = ready_get_thread(tid)) == NULL) {
                 if (running_thread->tid == tid) {
-                    running_thread->prio = prio;
+                    running_thread->ticket = prio;
                     return SUCCESS_CODE;
                 }
                 else {
@@ -773,14 +773,14 @@ int csetprio(int tid, int prio) {
         // certa.
         thread = ready_remove(thread->tid);
         if (thread != NULL) {
-            thread->prio = prio;  // Altera a prioridade da thread.
-            ready_push(thread);   // Coloca na fila certa.
+            thread->ticket = prio;  // Altera a prioridade da thread.
+            ready_push(thread);     // Coloca na fila certa.
         }
     }
     else {
         // Neste caso, a thread não está nos aptos, e podemos simplesmente
         // alterar sua prioridade.
-        thread->prio = prio;
+        thread->ticket = prio;
     }
 
     return SUCCESS_CODE;

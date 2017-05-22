@@ -15,13 +15,13 @@
 
 typedef struct s_sem {
     // indica se recurso está ocupado ou não (livre > 0, ocupado = 0)
-	int	count;
+    int count;
 
     // ponteiro para uma fila de threads bloqueadas no semáforo
-	PFILA2 fila;
+    PFILA2 fila;
 } csem_t;
 
-int ccreate(void* (*start)(void*), void *arg, int prio);
+int ccreate(void *(*start)(void *), void *arg, int prio);
 int csetprio(int tid, int prio);
 int cyield(void);
 int cjoin(int tid);
