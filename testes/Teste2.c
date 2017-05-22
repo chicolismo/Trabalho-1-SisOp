@@ -122,10 +122,10 @@ int main()
 {
 	int i = 42;
 	printf("comecou teste: o valor entre parenteses é o valor correto, caso há divergencias há problemas no cyield.\n");
-	if((Fazendeiro = ccreate(fazendeiro, (void *)&i)))
-		if((Colheita = ccreate(colheita, (void *)&i)))
-			if((Venda = ccreate(venda, (void *)&i)))
-				if((Consumo = ccreate(consumo, (void *)&i))){
+	if((Fazendeiro = ccreate(fazendeiro, (void *)&i,0)))
+		if((Colheita = ccreate(colheita, (void *)&i,0)))
+			if((Venda = ccreate(venda, (void *)&i,0)))
+				if((Consumo = ccreate(consumo, (void *)&i,0))){
 				printf("criou thread\n");
 				if(csem_init(&Plantacao, 1) == 0){
 					if(csem_init(&Mercado, 1)==0)

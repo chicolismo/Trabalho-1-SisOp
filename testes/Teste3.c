@@ -138,10 +138,10 @@ int main()
 {
 	int i = 42;
 	printf("comecou\n");
-	thread1 = ccreate(func1, (void *)&i);
-	thread2 = ccreate(func2, (void *)&i);
-	thread3 = ccreate(func3, (void *)&i);
-	thread4 = ccreate(func4, (void *)&i);
+	thread1 = ccreate(func1, (void *)&i,0);
+	thread2 = ccreate(func2, (void *)&i,0);
+	thread3 = ccreate(func3, (void *)&i,0);
+	thread4 = ccreate(func4, (void *)&i,0);
 	printf("criou thread\n");
 	csem_init(&semaforo, 1);
 	printf("iniciou semaforo\n");
