@@ -57,7 +57,7 @@ void*   mandel(void *arg) {
     t = ((struct work*)arg)->t;
     tid = ((struct work*)arg)->tid;
 
-    plan = (int *)malloc( n/t * n * sizeof(int));
+    printf("Plan: %d\n", *plan);
     ((struct work*)arg)->region = plan;
 
     /* Escala para cada ponto, em cada direcao */
