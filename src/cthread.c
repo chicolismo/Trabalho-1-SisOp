@@ -1,7 +1,8 @@
 // vim: sw=4 ts=4 sts=4 expandtab foldenable foldmethod=syntax
 
 #ifdef __APPLE__
-#define _XOPEN_SOURCE 500 // Carlos: Gambiarra para não exibir avisos de "deprecated" na minha máquina.
+// Necessário para não exibir avisos de "deprecated" no macOs
+#define _XOPEN_SOURCE 500
 #endif
 
 #include <stdlib.h>
@@ -16,17 +17,30 @@
 
 
 //=============================================================================
-// Tipos
-//=============================================================================
-typedef char byte;
-
-
-//=============================================================================
 // Constantes
 //=============================================================================
 
+//-----------------------------------------------------------------------------
+// Como funciona o debug:
+// para ativar, deixe     #define DEBUG(X) printf X
+// para desativar, deixe  #define DEBUG(X) //printf X
+//
+// ex: DEBUG(("HELLO WORLD!!");
+//
+// se estiver ativado:    DEBUG(X) se transforma em printf("HELLO WORLD!!");
+// se estiver desativado: DEBUG(X) se transforma em //printf("HELLO WORLD!!");
+//-----------------------------------------------------------------------------
+#define DEBUG(X) //printf X
+#define SHOULD_DEBUG 0
+
+
 // Faz "cast" um arg para um ponteiro de função void sem argumentos
 #define VOID_FUNCTION(arg) (void (*)(void)) (arg)
+
+
+//-----------------------------------------------------------------------------
+// Códigos de erro
+//-----------------------------------------------------------------------------
 
 // ccreate
 #define CCREATE_ERROR -1
@@ -39,8 +53,7 @@ typedef char byte;
 #define CIDENTIFY_SUCCESS 0
 #define CIDENTIFY_ERROR -1
 
-
-//Public Functions use
+// funcões genéricas
 #define SUCCESS_CODE 0
 #define ERROR_CODE -1
 
@@ -52,27 +65,31 @@ typedef char byte;
 //==============================================================================
 // Globais
 //==============================================================================
+
+// Flag para detectar a inicialização das variáveis.
 bool initialized_globals = false;
 
+// TID a ser usado nas novas threads
 int current_tid = 0;
 
 // As filas de threads.
 // Devem ser ponteiros para podermos usar CreateFila2.
-FILA2 *ready[4];          // Quatro filas de aptos
-FILA2 *blocked_join;      // Bloqueados esperando outra thread terminar
-FILA2 *blocked_semaphor;  // Bloqueados esperando semáforo
-TCB_t *running_thread = NULL;    // Executando
+FILA2 *ready[4];               // Quatro filas de aptos
+FILA2 *blocked_join;           // Bloqueados esperando outra thread terminar
+FILA2 *blocked_semaphor;       // Bloqueados esperando semáforo
+TCB_t *running_thread = NULL;  // Executando
 ucontext_t *ending_ctx = NULL;
 
 
 //==============================================================================
 // Funções
 //==============================================================================
-//geracao e destruição de tid/tcb
+
 // Gera uma nova tid
 int generate_tid() {
     return ++current_tid;
 }
+
 // Destrói a thread.
 void cdestroy(TCB_t *thread) {
     running_thread->state = PROCST_TERMINO;
@@ -83,39 +100,49 @@ void cdestroy(TCB_t *thread) {
 
 
 //------------------------------------------------------------------------------
-//Funcoes da lista de bloqueados cjoin
+// Funças da lista de bloqueados cjoin
 //------------------------------------------------------------------------------
-int blocked_join_insert(DUPLA_t *thread) { //essa estrutura Duplacjoin está definida em queue.h
-    //funcao que insere uma dupla thread,tid esperado na lista de bloq. cjoin.
-    //provavelmente a funcao seja so isso.
+
+/*
+ * Insere uma dupla (thread, tid) esperada na lista de bloq.cjoin.
+ */
+int blocked_join_insert(DUPLA_t *thread) {
+    // A estrutura Duplacjoin está definida em queue.h.
     return AppendFila2(blocked_join, thread);
 }
 
-int blocked_join_remove(DUPLA_t *toremove) { //essa estrutura Duplacjoin está definida em queue.h
-    //funcao que remove uma dupla da fila. sera chamado apos encontrar um tid esperado na fila e recuperar a thread
-    //bloqueada, pode ser implementada dentro da funcao de get_thread_waiting_for, mas isso eh escolha de quem implementar.
+
+/*
+ * Remove uma dupla (thread, tid) da fila de bloq.cjoin.
+ * Será chamada após encontrar um tid esperado na fila e recuperar a thread bloqueada.
+ */
+int blocked_join_remove(DUPLA_t *toremove) {
+    // A estrutura Duplacjoin está definida em queue.h.
+
     if (FirstFila2(blocked_join) == 0) {
         do {
             DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
-            if (value != NULL)
+            if (value != NULL) {
                 if (value == toremove) {
                     return  DeleteAtIteratorFila2(blocked_join);
                 }
-        }
-        while (NextFila2(blocked_join) == 0);
+            }
+        } while (NextFila2(blocked_join) == 0);
 
         return ERROR_CODE;
 
-
-    } // Fila vazia, não É POSSÍVEL REMOVER.
+    }
     else {
+        // Fila vazia, não é possível remover.
         return ERROR_CODE;
     }
 }
 
+/*
+ * Verifica a existência de uma thread na fila de bloquados por cjoin.
+ * Caso a thread exista, retorna seu ponteiro, caso contrário, retorna NULL.
+ */
 TCB_t *blocked_join_get_thread(int tid) {
-    //funcao que verifica a existencia de uma thread na fila de bloqueados por cjoin.
-    //retorna um ponteiro para a thread caso a encontre, e um ponteiro NULL caso a thread nao seja encontrada.
     if (FirstFila2(blocked_join) == 0) {
         do {
             DUPLA_t *value = (DUPLA_t *)GetAtIteratorFila2(blocked_join);
@@ -123,22 +150,24 @@ TCB_t *blocked_join_get_thread(int tid) {
                 if (value->blockedThread->tid == tid) {
                     return  value->blockedThread;
                 }
-        }
-        while (NextFila2(blocked_join) == 0);
+        } while (NextFila2(blocked_join) == 0);
         return NULL;
 
 
-    } // Fila vazia, não existe.
+    }
     else {
+        // Fila vazia, não existe.
         return NULL;
     }
 }
 
-DUPLA_t *blocked_join_get_thread_waiting_for(int
-        tid) { //essa estrutura Duplacjoin está definida em queue.h
-    //funcao que procura por um tid esperado na lista de duplas da fila cjoin,
-    //pode retornar a thread ou a dupla, pensei na dupla so para ser mais direto a busca. Mas de novo, decisao de implementacao.
-    //retorna um ponteiro para a dupla/thread caso exista uma thread bloqueada pelo tid, e um ponteiro NULL caso nao exista
+/*
+ * Procura por um tid esperado na lista de duplas da fila cjoin.  Retorna o
+ * ponteiro para a dupla, caso exista uma thread bloqueada com o tid fornecido.
+ * Caso contrário, retorna NULL.
+ */
+DUPLA_t *blocked_join_get_thread_waiting_for(int tid) {
+    // A estrutura Duplacjoin esta definida em queue.h.
 
     if (FirstFila2(blocked_join) == 0) {
         do {
@@ -147,16 +176,17 @@ DUPLA_t *blocked_join_get_thread_waiting_for(int
                 if (value->waitedTid == tid) {
                     return  value;
                 }
-        }
-        while (NextFila2(blocked_join) == 0);
+        } while (NextFila2(blocked_join) == 0);
         return NULL;
 
 
-    } // Fila vazia, não existe.
+    }
     else {
+        // Fila vazia, não existe.
         return NULL;
     }
 }
+
 
 void debug_print_blocked_list() {
     DUPLA_t *print;
@@ -170,13 +200,13 @@ void debug_print_blocked_list() {
                 break;
             }
             if (print->blockedThread != NULL) {
-                DEBUG(("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid, print->waitedTid));
+                DEBUG(("# tid bloqueado: %d   /   esperando pelo tid: %d  # \n", print->blockedThread->tid,
+                       print->waitedTid));
             }
             else {
                 DEBUG(("# tid bloqueado: atual  / esperando pelo tid: %d # \n", print->waitedTid));
             }
-        }
-        while (NextFila2(blocked_join) == 0);
+        } while (NextFila2(blocked_join) == 0);
         DEBUG(("##################################################\n"));
         return;
     }
@@ -184,7 +214,7 @@ void debug_print_blocked_list() {
 }
 
 //------------------------------------------------------------------------------
-//Funcoes de Semaforo
+// Funções de Semáforo
 //------------------------------------------------------------------------------
 
 int semaphore_queue_insert_thread(csem_t *sem, TCB_t *thread) {
@@ -193,34 +223,35 @@ int semaphore_queue_insert_thread(csem_t *sem, TCB_t *thread) {
 }
 
 int insert_semaphore_on_blocked_semaphor(csem_t *sem) {
-    //funcao que insere um semaforo na lista de semaforos criados.
+    //funcao que insere um semáforo na lista de semáforos criados.
     //retorna 0 quando a insercao e bem sucedida e -1 quando ha erros.
 
     if (FirstFila2(blocked_semaphor) == 0) {
         do {
             csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
             if (value != NULL && value == sem) {
-                //semaforo ja esta na fila, portanto nao ha insercao e retorna codigo de sucesso.
+                // Semáforo já está na fila, portanto não há inserção e retorna código de sucesso.
                 return SUCCESS_CODE;
             }
-        }
-        while (NextFila2(blocked_semaphor) == 0);
-        //caso o semaforo nao esteja inserido, ele eh entao inserido na fila.
+        } while (NextFila2(blocked_semaphor) == 0);
+        // Caso o semáforo não esteja inserido, ele é então inserido na fila.
         return AppendFila2(blocked_semaphor, sem);
 
 
     }
     else {
-        //caso seja o primeiro elemento, o semaforo sem eh simplesmente inserido.
+        // Caso seja o primeiro elemento, o semáforo "sem" é simplesmente
+        // inserido.
         return AppendFila2(blocked_semaphor, sem);
     }
 }
 
+/*
+ * Remove e retorna o primeiro elemento da fila de um semáforo.
+ * Retorna um ponteiro para a thread se a função for bem sucedida, caso
+ * contrário, retorna NULL
+ */
 TCB_t *get_first_of_semaphore_queue(csem_t *sem) {
-    //funcao que remove e retorna o primeiro elemento da fila de um semaforo
-    //retorna um ponteiro para a thread se a funcao for bem sucedida
-    //e um ponteiro NULL em caso de thread nao existente.
-
     if (FirstFila2(sem->fila) == 0) {
         TCB_t *value = (TCB_t *)GetAtIteratorFila2(sem->fila);
         DeleteAtIteratorFila2(sem->fila);
@@ -232,34 +263,37 @@ TCB_t *get_first_of_semaphore_queue(csem_t *sem) {
     }
 }
 
+/*
+ * Verifica a existência de uma thread nas filas de bloqueados dos semáforos.
+ * NÃO remove nenhuma thread.
+ * Retorna um ponteiro para a thread se for bem sucedida ou NULL caso contrário.
+ */
 TCB_t *get_thread_from_blocked_semaphor(int tid) {
-    //funcao que verifica a existencia de uma thread nas filas de bloqueados dos semaforos
-    //NAO REMOVE nenhuma thread, Retorna um ponteiro para a thread se for bem sucedida
-    //e um ponteiro NULL em caso de erro
-
     if (FirstFila2(blocked_semaphor) == 0) {
-        do { //iteracao para varrer a lista de semaforos.
+        // Varre a lista de semáforos.
+        do {
             csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
             if (value == NULL) {
-                break;    //precisa desse teste pois caso value seja igual a NULL, o ponteiro de
+                // Precisa desse teste, pois caso "value" seja NULL, "value->fila" será um segfault
+                break;
             }
-            //value->fila apontara para um endereco nao conhecido e acontecera segmentation fault.
             if (FirstFila2(value->fila) == 0) {
-                do { //iteracao para varrer a fila de bloqueados do semaforo
+                // Varre a lista de bloqueados do semáforo
+                do {
                     TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
                     if (value2 == NULL) {
-                        break;    //teste necessario, pois caso value2 seja igual a NULL,
+                        // Caso "value2" seja null, "value2->tid" será segfault também.
+                        break;
                     }
-                    //acontecera segmentation fault no ponteiro value2->tid
-                    if (value2->tid == tid) { //encontrou a thread procurada.
+                    if (value2->tid == tid) {
+                        // Thread procurada foi encontrada.
                         return value2;
                     }
-                }
-                while (NextFila2(value->fila) == 0);
+                } while (NextFila2(value->fila) == 0);
             }
-        }
-        while (NextFila2(blocked_semaphor) == 0);
-        //Nao encontrou a thread, retornara um ponteiro NULL
+        } while (NextFila2(blocked_semaphor) == 0);
+
+        // Thread não encontrada.
         return NULL;
     }
     else {
@@ -268,9 +302,11 @@ TCB_t *get_thread_from_blocked_semaphor(int tid) {
     }
 }
 
+/*
+ * Imprime a lista de semáforos em detalhes.
+ */
 int debug_blocked_semaphor() {
     int i = 1;
-    //função que imprime a lista de semaforos em detalhes.
     DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     if (FirstFila2(blocked_semaphor) == 0) {
         do {
@@ -278,29 +314,27 @@ int debug_blocked_semaphor() {
             csem_t *value = (csem_t *)GetAtIteratorFila2(blocked_semaphor);
             if (value != NULL) {
                 DEBUG(("== Semaforo %2i. Count = %2i               ==\n", i, value->count));
-                if(FirstFila2(value->fila) == 0){
-                    DEBUG(("Tids bloqueados:\n"));                
-                    do{
+                if (FirstFila2(value->fila) == 0) {
+                    DEBUG(("Tids bloqueados:\n"));
+                    do {
                         TCB_t *value2 = (TCB_t *)GetAtIteratorFila2(value->fila);
-                        if(value2 != NULL){                        
-                            DEBUG(("%d\n",value2->tid));
+                        if (value2 != NULL) {
+                            DEBUG(("%d\n", value2->tid));
                         }
-                    }while(NextFila2(value->fila) == 0);
+                    } while (NextFila2(value->fila) == 0);
                 }
                 i++;
             }
-        }
-        while (NextFila2(blocked_semaphor) == 0);
-
-
+        } while (NextFila2(blocked_semaphor) == 0);
     }
     else {
         DEBUG(("========== NÃO HÁ LISTA SEMÁFORO =========\n"));
 
     }
-   DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
+    DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     return 0;
 }
+
 
 //==============================================================================
 // Filas de Aptos
@@ -322,46 +356,45 @@ int ready_push(TCB_t *thread) {
 TCB_t *ready_shift() {
     TCB_t *th = NULL;
     int i;
-    //DEBUG(("ready_shift>\n"));
     for (i = 0; i < 4; ++i) {
         if (FirstFila2(ready[i]) == SUCCESS_CODE) {
-            //DEBUG(("ready_shift>Encontrado thread para execução com prioridade: %i e tid:", i));
             th = (TCB_t *) GetAtIteratorFila2(ready[i]);
             DeleteAtIteratorFila2(ready[i]);
-            //DEBUG(("%d\n", th->tid));
             break;
         }
     }
     return th;
 }
 
-/*
- * Retorna um resultado de busca nas filas de aptos.  Caso seja encontrada a
- * thread com o tid correspondente, é retornada uma estrutura contendo o
- * iterador da fila em que a thread se encontra, bem como o número da fila.
- *
- * Caso nenhuma thread com o tid fornecido seja encontrada, a função retorna
- * NULL
- */
-FindResult *ready_find(int tid) {
-    FindResult *result = NULL;
-    int i;
-    for (i = 0; i < 4; ++i) {
-        FirstFila2(ready[i]);
-        do {
-            if (((TCB_t *)GetAtIteratorFila2(ready[i]))->tid == tid) {
-                result->node = ready[i]->it;
-                result->queue_number = i;
-            }
-        }
-        while (NextFila2(ready[i]) == 0);
-    }
-    return result;
-}
+// /*
+//  * Retorna um resultado de busca nas filas de aptos.  Caso seja encontrada a
+//  * thread com o tid correspondente, é retornada uma estrutura contendo o
+//  * iterador da fila em que a thread se encontra, bem como o número da fila.
+//  *
+//  * Caso nenhuma thread com o tid fornecido seja encontrada, a função retorna
+//  * NULL.
+//  */
+// FindResult *ready_find(int tid) {
+//     FindResult *result = NULL;
+//     int i;
+//     for (i = 0; i < 4; ++i) {
+//         FirstFila2(ready[i]);
+//         do {
+//             if (((TCB_t *)GetAtIteratorFila2(ready[i]))->tid == tid) {
+//                 result->node = ready[i]->it;
+//                 result->queue_number = i;
+//             }
+//         } while (NextFila2(ready[i]) == 0);
+//     }
+//     return result;
+// }
 
+/*
+ * Retorna uma thread das filas de aptos a partir de sua tid.
+ * Não remove a thread, apenas retorna seu ponteiro, caso exista.
+ * Se não existir, retorna NULL
+ */
 TCB_t *ready_get_thread(int tid) {
-    //funçao que retorna uma thread da fila de aptos a partir de uma tid.
-    //Nao remove a thread, apenas retorna um ponteiro para ela caso exista, ou NULL caso nao exista
     TCB_t *thread = NULL;
     int i;
     for (i = 0; i < 4; ++i) {
@@ -373,8 +406,7 @@ TCB_t *ready_get_thread(int tid) {
                         return thread;
                     }
                 }
-            }
-            while (NextFila2(ready[i]) == 0);
+            } while (NextFila2(ready[i]) == 0);
         }
     }
     return NULL;
@@ -388,12 +420,9 @@ TCB_t *ready_get_thread(int tid) {
  * Caso ele não seja encontrado, nada acontece e NULL é retornado.
  */
 TCB_t *ready_remove(int tid) {
-    //FindResult *result = ready_find(tid); dando segmentation fault
     TCB_t *thread = NULL;
     TCB_t *result = ready_get_thread(tid);
     if (result != NULL) {
-        //DeleteAtIteratorFila2(ready[result->queue_number]);
-        
         if (FirstFila2(ready[result->prio]) == SUCCESS_CODE) {
             do {
                 thread = (TCB_t *)GetAtIteratorFila2(ready[result->prio]);
@@ -402,12 +431,9 @@ TCB_t *ready_remove(int tid) {
                         DeleteAtIteratorFila2(ready[result->prio]);
                     }
                 }
-            }
-            while (NextFila2(ready[result->prio]) == 0);
-            //return (TCB_t *)(result->node->node);
+            } while (NextFila2(ready[result->prio]) == 0);
             return result;
-            }
-    
+        }
     }
     return NULL;
 }
@@ -426,47 +452,54 @@ void debug_ready() {
                 print = (TCB_t *)GetAtIteratorFila2(ready[i]);
                 if (print != NULL) {
                     DEBUG(("# %d\n", print->tid));
-                    }
-            }while (NextFila2(ready[i]) == 0);
+                }
+            }
+            while (NextFila2(ready[i]) == 0);
             DEBUG(("##################################################\n"));
         }
     }
     return;
 }
 
+
 //------------------------------------------------------------------------------
 //Funcoes de inicialização
 //------------------------------------------------------------------------------
 
 int init_main_thread() {
-    //TODO: implementar a inicializacao da thread main.
-
-    TCB_t *thread = (TCB_t *)malloc(sizeof(TCB_t));
-
+    // Inicializacao da thread main.
+    TCB_t *thread = (TCB_t *) malloc(sizeof(TCB_t));
     thread->tid = current_tid;
-    thread->prio = 0; //?????? nao sei qual a prioridade da thread main.
+    thread->prio = 0; // Thread main terá a maior prioridade.
     thread->state = PROCST_EXEC;
 
+    // Criação da pilha da main.
     if (((thread->context).uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
-        //Sem espaço na memória para criar a TCB
+        // Sem espaço na memória para criar a TCB
         return ERROR_CODE;
     }
 
     (thread->context).uc_stack.ss_size = SIGSTKSZ;
-    (thread->context).uc_link = NULL;  //Quando a thread main acaba o programa acaba.
-    running_thread =
-        thread;  //Não é inserido em nenhuma fila, a thread simplesmente está em execução.
 
-    //Não é necessário usar um makecontext, pois o contexto da thread é a propria main, que está em execução.
+    // Quando a thread main acaba o programa acaba.
+    (thread->context).uc_link = NULL;
+
+    // Não é inserido em nenhuma fila, a thread simplesmente está em execução.
+    running_thread = thread;
+
+    // Não é necessário usar um makecontext, pois o contexto da thread é a
+    // propria main, que está em execução.
 
     return SUCCESS_CODE;
 }
+
 void end_thread();
+
 int init_ending_ctx() {
     ending_ctx = malloc(sizeof(ucontext_t));
 
     if ((getcontext(ending_ctx) != 0) || ending_ctx == NULL) {
-        // Deu merda
+        // Erro na inicialização do contexto de finalização
         return INIT_ENDING_CTX_ERROR;
     }
 
@@ -479,13 +512,12 @@ int init_ending_ctx() {
     return INIT_ENDING_CTX_SUCCESS;
 }
 
-//------------------------------------------------------------------------------
-// Esta função inicializa todas as variáveis globais das quais as outras
-// funções dependem.  Deve ser chamada nas outras funções, por garantia.
-//------------------------------------------------------------------------------
+/*
+ * Inicializa todas as variáveis globais das quais as outras funções dependem.
+ * Deve ser chamada nas outras funções da biblioteca, por garantia.
+ */
 int init() {
     if (!initialized_globals) {
-
         initialized_globals = true;
 
         // inicializar a thread main e colocar em executando.
@@ -498,29 +530,29 @@ int init() {
             return ERROR_CODE;
         }
 
-        // O tamanho em bytes da struct de fila. Não é possível obter o tamanho a
-        // partir do tipo PFILA2, que é um ponteiro. -> é só utilizar sizeof(FILA2).
+        // Tamanho de cada struct de fila
+        size_t queue_size = sizeof(struct sFila2);
 
         // Inicializa as diversas filas de threads
-        size_t queue_size = sizeof(struct sFila2);
         int i;
         for (i = 0; i < 4; ++i) {
             ready[i] = malloc(queue_size);
             CreateFila2(ready[i]);
         }
-        blocked_join = (FILA2 *)malloc(sizeof(FILA2));
+        blocked_join = (FILA2 *) malloc(sizeof(FILA2));
 
         if (CreateFila2(blocked_join) != SUCCESS_CODE) {
             return ERROR_CODE;
         }
 
-        blocked_semaphor = (FILA2 *)malloc(sizeof(FILA2));
+        blocked_semaphor = (FILA2 *) malloc(sizeof(FILA2));
         if (CreateFila2(blocked_semaphor) != SUCCESS_CODE) {
             return ERROR_CODE;
         }
 
         return SUCCESS_CODE;
     }
+
     return SUCCESS_CODE;
 }
 
@@ -533,11 +565,10 @@ void even(void) {
     [..]
 }
 
-int main(void)
-{
+int main(void) {
 
     ucontext_t main_context, even_context;
-[...]
+    [...]
 
      * É necessario criar uma estrutura contexto a partir de um molde.
      * O contexto da propria main serve como esse molde.
@@ -567,20 +598,26 @@ int main(void)
 }
 */
 
+/*
+ * Escalonador.
+ */
 int dispatch() {
-
-    int swapped_context = 0;
+    bool swapped_context = false;
 
     DEBUG(("===Dispatch=== \n"));
 
-    if (running_thread != NULL) { // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
+    if (running_thread != NULL) {
+        // se uma thread acabar o running thread é NULL, o teste evita segmentation fault.
+
         DEBUG(("Thread %d perdendo a execução. ", running_thread->tid));
         getcontext(&(running_thread->context));
     }
 
-    if (swapped_context == 0) {
-        // Somente executará no contexto original, quando a thread está voltando de execução não é executado.
-        swapped_context = 1;
+    if (!swapped_context) {
+        // Somente executará no contexto original, quando a thread está
+        // voltando de execução não é executado.
+
+        swapped_context = true;
         running_thread = ready_shift();
 
         if (running_thread == NULL || running_thread->tid < 0) {
@@ -593,18 +630,21 @@ int dispatch() {
     }
     return SUCCESS_CODE;
 }
-//*********************************
-// Função fim de thread
-//*********************************
+
+/*
+ * Função a ser executada ao final de cada thread.
+ */
 void end_thread() {
     if (running_thread == NULL) {
-        //nao há thread em execução
+        // Não há thread em execução
         return;
     }
 
     int tid = running_thread->tid;
     DEBUG(("Thread %d Acabando\n", tid));
+
     cdestroy(running_thread);
+
     // Procura pela thread que estava esperando esta aqui terminar.
     DUPLA_t *waiting_thread = blocked_join_get_thread_waiting_for(tid);
 
@@ -613,12 +653,10 @@ void end_thread() {
         dispatch();
     }
     else {
-
         DEBUG(("Há uma thread esperando pelo fim dessa tid.\n"));
         blocked_join_remove(waiting_thread);
         waiting_thread->blockedThread->state = PROCST_APTO;
-        DEBUG(("Thread %d estava esperando e foi inserida na fila de aptos.\n",
-               waiting_thread->blockedThread->tid));
+        DEBUG(("Thread %d estava esperando e foi inserida na fila de aptos.\n", waiting_thread->blockedThread->tid));
         ready_push(waiting_thread->blockedThread);
         dispatch();
     }
@@ -695,22 +733,6 @@ void end_thread() {
  *  Quando executada corretamente: retorna um valor positivo, que representa o
  *  identificador da thread criada, caso contrário, retorna um valor negativo.
  */
-//------------------------------------------------------------------------------
-// Cria uma nova thread.
-//
-// Parmetros:
-//  start: ponteiro para a função que a thread executará.
-//
-//  arg: um parâmetro que pode ser passado para a thread na sua criação.
-//  (Obs.: é um único parâmetro. Se for necessário passar mais de um valor
-//  deve-se empregar um ponteiro para uma struct)
-//
-//  prio: prioridade com que deve ser criada a thread.
-//
-// Retorno:
-//  Quando executada corretamente: retorna um valor positivo, que representa o
-//  identificador da thread criada, caso contrário, retorna um valor negativo.
-//------------------------------------------------------------------------------
 int ccreate(void *(*start)(void *), void *arg, int priority) {
     init();
 
@@ -727,14 +749,8 @@ int ccreate(void *(*start)(void *), void *arg, int priority) {
     if ((thread->context.uc_stack.ss_sp = malloc(SIGSTKSZ)) == NULL) {
         return CCREATE_ERROR;
     }
-    DEBUG(("Ccreate> Criando thread %d\n",thread->tid));
+    DEBUG(("Ccreate> Criando thread %d\n", thread->tid));
 
-    // NOTE: Descobrir o que fazer com o resto do contexto.
-    // th->context.uc_link  ->> contexto de finalização
-    // th->context.uc_sigmask ->> man: uc_sigmask is the set of signals blocked in this context, acho que nao precisa setar nada.
-    // th->context.uc_stack;  ->> pilha usada pelo contexto, precisa um set em uc_stack.ss_size
-    // th->context.uc_mcontext ->> man: uc_mcontext is the machine-specific representation of the saved
-    // context, that includes the calling thread's machine registers. Acho que a propria funcao de getcontext ja faz o set.
     thread->context.uc_stack.ss_size = SIGSTKSZ;
     thread->context.uc_link = ending_ctx;
     makecontext(&(thread->context), VOID_FUNCTION(start), 1, arg);
@@ -748,21 +764,22 @@ int csetprio(int tid, int prio) {
     init();
     bool thread_in_ready = false;
     DEBUG(("csetprio>\n"));
-    DEBUG(("Alterando prioridade da thread %i para %i\n",tid,prio));
+    DEBUG(("Alterando prioridade da thread %i para %i\n", tid, prio));
 
     if (prio < 0 || prio > 3) {
-        //prioridade nao esta no intervalo [0,3]
+        // Prioridade não está no intervalo [0, 3]
         return ERROR_CODE;
     }
+
     TCB_t *thread = NULL;
     if ((thread = blocked_join_get_thread(tid)) == NULL) {
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
             if ((thread = ready_get_thread(tid)) == NULL) {
-                if(running_thread->tid == tid){ 
+                if (running_thread->tid == tid) {
                     running_thread->prio = prio;
                     return SUCCESS_CODE;
-                    }
-                else{
+                }
+                else {
                     DEBUG(("Thread a ser modificada não existe.\n"));
                 }
                 return ERROR_CODE;
@@ -772,71 +789,78 @@ int csetprio(int tid, int prio) {
             }
         }
     }
-    // A thread existe e est[a apontada pelo ponteiro thread.
+    // A thread existe e está apontada pelo ponteiro "thread".
 
     if (thread_in_ready) {
-        //TODO: remoção da fila de aptos, troca de prioridade e reinserçao na fila de aptos.
+        // Caso a thread esteja na fila de aptos, temos que removê-la da fila
+        // com prioridade atual, e inseri-la na sua nova fila com a prioridade
+        // certa.
         thread = ready_remove(thread->tid);
         if (thread != NULL) {
-            thread->prio = prio;
-            ready_push(thread);
+            thread->prio = prio;  // Altera a prioridade da thread.
+            ready_push(thread);   // Coloca na fila certa.
         }
     }
     else {
+        // Neste caso, a thread não está nos aptos, e podemos simplesmente
+        // alterar sua prioridade.
         thread->prio = prio;
     }
+
     return SUCCESS_CODE;
 }
 
 int cyield() {
     init();
-    DEBUG(("cyield>\n Thread %d cedendo a execução voluntariamente.\n",running_thread->tid));
+    DEBUG(("cyield>\n Thread %d cedendo a execução voluntariamente.\n", running_thread->tid));
 
+    // Muda-se o estado da thread em execução para "apto", e ela é colocada de volta pra fila de aptos.
     running_thread->state = PROCST_APTO;
     ready_push(running_thread);
+
+    // O escalonador é acionado.
     return dispatch();
 }
 
 int cjoin(int tid) {
     init();
-
     DEBUG(("Cjoin> join na thread %d pela thread %d\n", tid, running_thread->tid));
 
     if (blocked_join_get_thread_waiting_for(tid) != NULL) {
         DEBUG(("A thread ja esta sendo esperada.\n"));
         return ERROR_CODE;
     }
+
     TCB_t *thread = NULL;
     if ((thread = blocked_join_get_thread(tid)) == NULL) {
-        //DEBUG(("Não encontrou a thread com o tid nos bloqueados.\n"));
         if ((thread = get_thread_from_blocked_semaphor(tid)) == NULL) {
-            //DEBUG(("Não encontrou a thread com o tid parado nos semaforos.\n"));
             if ((thread = ready_get_thread(tid)) == NULL) {
-                //DEBUG(("Não encontrou a thread com o tid passado na fila de aptos.\n"));
                 DEBUG(("Thread não existe.\n"));
-                //Thread nao existe, retorna erro.
+                // Thread não existe, retorna erro.
                 return ERROR_CODE;
             }
         }
     }
 
     DEBUG(("Thread existe e não é esperada.\n"));
-    //Thread que se deseja esperar o termino existe, nao e esperada e esta apontada pelo ponteiro thread.
+    // Thread que se deseja esperar o término existe, não é esperada e está
+    // apontada pelo ponteiro "thread".
     DUPLA_t *new_cjoin = (DUPLA_t *) malloc(sizeof(DUPLA_t));
     new_cjoin->waitedTid = tid;
     new_cjoin->blockedThread = running_thread;
     running_thread->state = PROCST_BLOQ;
-
     blocked_join_insert(new_cjoin);
 
+#if SHOULD_DEBUG
     debug_print_blocked_list();
+#endif
 
     return dispatch();
 }
 
-//------------------------------------------------------------------------------
-// Inicializa um semáforo
-//------------------------------------------------------------------------------
+/*
+ * Inicializa um semáforo
+ */
 int csem_init(csem_t *sem, int count) {
     init();
     DEBUG(("csem_init>\n"));
@@ -850,12 +874,13 @@ int csem_init(csem_t *sem, int count) {
     }
     sem->count = count;
 
-    //printf("Inicializando a fila referente ao semáforo.\n");
-    sem->fila = (FILA2 *)malloc(sizeof(FILA2));
+    sem->fila = (FILA2 *) malloc(sizeof(FILA2));
 
-    //insere o semáforo na lista de semáforos
+    // Insere o semáforo na lista de semáforos
     if (insert_semaphore_on_blocked_semaphor(sem) == 0) {
+#if SHOULD_DEBUG
         debug_blocked_semaphor();
+#endif
         return CreateFila2(sem->fila);
     }
     else {
@@ -864,9 +889,10 @@ int csem_init(csem_t *sem, int count) {
 }
 
 /*
-    Tranca o semaforo se o mesmo ainda nao esta trancado, se ja estiver trancado
-    coloca a thread em uma fila de bloqueados, aguardando a liberacao do recurso
-*/
+ * Tranca o semáforo se o mesmo ainda não está trancado, se já estiver trancado
+ * coloca a thread em uma fila de bloqueados, aguardando a liberação do
+ * recurso.
+ */
 int cwait(csem_t *sem) {
     init();
     DEBUG(("cwait>\n"));
@@ -892,25 +918,27 @@ int cwait(csem_t *sem) {
 }
 
 /*
- * Destrava o semaforo, e libera as threads bloqueadas esperando pelo recurso
+ * Destrava o semáforo, e libera as threads bloqueadas esperando pelo recurso.
  */
 int csignal(csem_t *sem) {
     init();
     DEBUG(("csignal>\n"));
     if ((sem == NULL) || (sem->fila == NULL)) {
-        //Não é possivel dar signal em um ponteiro para um semaforo nulo ou cuja fila não esteja inicializada.
+        // Não é possivel dar signal em um ponteiro para um semáforo nulo ou
+        // cuja fila não esteja inicializada.
         return ERROR_CODE;
     }
 
     sem->count += 1;
     TCB_t *thread = (TCB_t *)get_first_of_semaphore_queue(sem);
-    if (thread != NULL) {//existia uma thread bloqueada pelo semaforo.
-        //estado da thread e modificado para APTO
+    if (thread != NULL) {
+        // Existia uma thread bloqueada pelo semáforo.
+        // Estado da thread e modificado para APTO
         thread->state = PROCST_APTO;
         return ready_push(thread);
     }
     else {
-        //O semaforo esta livre. Segue execucao.
+        //O semáforo esta livre. Segue execucao.
         return SUCCESS_CODE;
     }
 }
