@@ -30,7 +30,7 @@
 // se estiver ativado:    DEBUG(X) se transforma em printf("HELLO WORLD!!");
 // se estiver desativado: DEBUG(X) se transforma em //printf("HELLO WORLD!!");
 //-----------------------------------------------------------------------------
-#define DEBUG(X) //printf X
+#define DEBUG(X) printf X
 #define SHOULD_DEBUG 0
 
 // Faz "cast" de "arg" para um ponteiro de função void sem argumentos
@@ -304,7 +304,7 @@ TCB_t *get_thread_from_blocked_semaphor(int tid) {
 /*
  * Imprime a lista de semáforos em detalhes.
  */
-int debug_blocked_semaphor() {
+void debug_blocked_semaphor() {
     int i = 1;
     DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
     if (FirstFila2(blocked_semaphor) == 0) {
@@ -331,7 +331,6 @@ int debug_blocked_semaphor() {
 
     }
     DEBUG(("========== DEBUG SEMAPHORE LIST ==========\n"));
-    return 0;
 }
 
 
@@ -365,28 +364,6 @@ TCB_t *ready_shift() {
     return th;
 }
 
-// /*
-//  * Retorna um resultado de busca nas filas de aptos.  Caso seja encontrada a
-//  * thread com o tid correspondente, é retornada uma estrutura contendo o
-//  * iterador da fila em que a thread se encontra, bem como o número da fila.
-//  *
-//  * Caso nenhuma thread com o tid fornecido seja encontrada, a função retorna
-//  * NULL.
-//  */
-// FindResult *ready_find(int tid) {
-//     FindResult *result = NULL;
-//     int i;
-//     for (i = 0; i < 4; ++i) {
-//         FirstFila2(ready[i]);
-//         do {
-//             if (((TCB_t *)GetAtIteratorFila2(ready[i]))->tid == tid) {
-//                 result->node = ready[i]->it;
-//                 result->queue_number = i;
-//             }
-//         } while (NextFila2(ready[i]) == 0);
-//     }
-//     return result;
-// }
 
 /*
  * Retorna uma thread das filas de aptos a partir de sua tid.
