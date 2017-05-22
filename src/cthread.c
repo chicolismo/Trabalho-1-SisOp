@@ -17,7 +17,7 @@
 
 
 //=============================================================================
-// Constantes
+// Macros
 //=============================================================================
 
 //-----------------------------------------------------------------------------
@@ -25,7 +25,7 @@
 // para ativar, deixe     #define DEBUG(X) printf X
 // para desativar, deixe  #define DEBUG(X) //printf X
 //
-// ex: DEBUG(("HELLO WORLD!!");
+// ex: DEBUG(("HELLO WORLD!!"));
 //
 // se estiver ativado:    DEBUG(X) se transforma em printf("HELLO WORLD!!");
 // se estiver desativado: DEBUG(X) se transforma em //printf("HELLO WORLD!!");
@@ -33,14 +33,13 @@
 #define DEBUG(X) //printf X
 #define SHOULD_DEBUG 0
 
-
-// Faz "cast" um arg para um ponteiro de função void sem argumentos
+// Faz "cast" de "arg" para um ponteiro de função void sem argumentos
 #define VOID_FUNCTION(arg) (void (*)(void)) (arg)
 
 
-//-----------------------------------------------------------------------------
+//=============================================================================
 // Códigos de erro
-//-----------------------------------------------------------------------------
+//=============================================================================
 
 // ccreate
 #define CCREATE_ERROR -1
